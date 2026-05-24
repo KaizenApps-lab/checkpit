@@ -1,0 +1,35 @@
+{
+  "name": "CheckPit — Control Final de Taller",
+  "short_name": "CheckPit",
+  "description": "Sistema de control final de calidad para talleres automotrices. Inspección por posición física, generación de PDF y planes de acción.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0D1B2A",
+  "theme_color": "#0D1B2A",
+  "lang": "es",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9Ijk2IiBmaWxsPSIjMEQxQjJBIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyMTAiIGZpbGw9IiMwRjIyMzUiLz48cGF0aCBkPSJNMTQwIDI1NkwyMjggMzQ0TDM3MiAxNjgiIHN0cm9rZT0iIzAwQzQ4QyIgc3Ryb2tlLXdpZHRoPSI1NCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBmaWxsPSJub25lIi8+PC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9Ijk2IiBmaWxsPSIjMEQxQjJBIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyMTAiIGZpbGw9IiMwRjIyMzUiLz48cGF0aCBkPSJNMTQwIDI1NkwyMjggMzQ0TDM3MiAxNjgiIHN0cm9rZT0iIzAwQzQ4QyIgc3Ryb2tlLXdpZHRoPSI1NCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBmaWxsPSJub25lIi8+PC9zdmc+",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nueva inspección",
+      "short_name": "Inspeccionar",
+      "description": "Iniciar una nueva inspección de vehículo",
+      "url": "./index.html"
+    }
+  ]
+}

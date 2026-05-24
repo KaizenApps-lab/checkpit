@@ -1,0 +1,2136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CheckPit — Control Final de Taller</title>
+<link rel="manifest" href="./manifest.json"/>
+<meta name="theme-color" content="#0D1B2A"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="CheckPit"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9Ijk2IiBmaWxsPSIjMEQxQjJBIi8+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyMTAiIGZpbGw9IiMwRjIyMzUiLz48cGF0aCBkPSJNMTQwIDI1NkwyMjggMzQ0TDM3MiAxNjgiIHN0cm9rZT0iIzAwQzQ4QyIgc3Ryb2tlLXdpZHRoPSI1NCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBmaWxsPSJub25lIi8+PC9zdmc+"/>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#F0F4F8}
+#root{max-width:480px;margin:0 auto}
+input[type="date"]::-webkit-calendar-picker-indicator{opacity:0.5;cursor:pointer}
+input::placeholder{color:#A9B8C4}
+select{appearance:none;-webkit-appearance:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useMemo}=React;
+
+const C={
+  navy:"#0D1B2A",navyMd:"#1A2E42",navyLt:"#243D55",
+  green:"#00C48C",greenDk:"#009E72",greenXdk:"#007A59",greenLt:"#E6F9F4",
+  amber:"#F5A623",amberDk:"#C47D08",amberLt:"#FEF5E4",
+  red:"#E84040",redLt:"#FEE9E9",redDk:"#8B1A1A",
+  blue:"#2D7DD2",blueLt:"#EBF3FD",blueDk:"#1A5BA8",
+  purple:"#7C3AED",purpleLt:"#F3EEFF",purpleDk:"#5B21B6",
+  teal:"#0D6E9E",tealLt:"#E0F2FE",tealDk:"#075985",
+  text:"#0D1B2A",textMd:"#4A6070",textLt:"#8A9EB0",
+  border:"#DDE4EC",surface:"#F0F4F8",white:"#FFFFFF",
+};
+
+const LICENSE_RULES={
+  "CHECKPIT-DEMO":{maxDevices:1,taller:"Modo evaluación",type:"demo"},
+  "CHECKPIT-2026":{maxDevices:99,taller:"Taller Principal",type:"paid"},
+  "CP-TALLER-001":{maxDevices:99,taller:"Taller Autorizado #1",type:"paid"},
+};
+const ACTIVATIONS={"CHECKPIT-DEMO":["device_OTHER_xyz"]};
+const TODAY="2026-05-23";
+const MOTIVOS=["Mantenimiento","Reparación correctiva","Garantía","Colisión","PDI (pre-entrega)"];
+
+// ── INSPECCIONES DE EJEMPLO ────────────────────────────────────────────────
+const MOCK=[
+  {id:1,placa:"ABC123",ot:"OT-0041",model:"GLC 300",motivo:"Mantenimiento",inspector:"J. Martínez",result:"ok",  date:"2026-05-23",nos:[]},
+  {id:2,placa:"XYZ789",ot:"OT-0040",model:"C 200",  motivo:"Reparación correctiva",inspector:"R. Gómez",result:"warn",date:"2026-05-23",nos:["N1","H1","E3"]},
+  {id:3,placa:"DEF456",ot:"OT-0039",model:"GLE 450",motivo:"Garantía",inspector:"J. Martínez",result:"ok",  date:"2026-05-22",nos:[]},
+  {id:4,placa:"GHI321",ot:"OT-0038",model:"E 300",  motivo:"Reparación correctiva",inspector:"P. Torres",result:"fail",date:"2026-05-22",nos:["N1","M5","H1","H2","E1"]},
+  {id:5,placa:"JKL654",ot:"OT-0037",model:"A 200",  motivo:"Mantenimiento",inspector:"R. Gómez",result:"ok",  date:"2026-05-21",nos:[]},
+  {id:6,placa:"MNO987",ot:"OT-0036",model:"GLC 300",motivo:"PDI (pre-entrega)",inspector:"J. Martínez",result:"warn",date:"2026-05-21",nos:["N1","H1","E2"]},
+  {id:7,placa:"PQR147",ot:"OT-0035",model:"C 200",  motivo:"Garantía",inspector:"P. Torres",result:"ok",  date:"2026-05-20",nos:[]},
+  {id:8,placa:"STU258",ot:"OT-0034",model:"GLE 450",motivo:"Colisión",inspector:"R. Gómez",result:"warn",date:"2026-05-19",nos:["H1","M3","E3"]},
+];
+
+const ITEM_LABELS={
+  E1:"Daños de carrocería",E2:"Desperfectos en pintura",E3:"Limpieza / grasa en exterior",
+  N1:"Presión de neumáticos fuera de rango",N2:"Pastillas / discos con anomalía",N3:"Tuercas sin par de apriete",
+  M1:"Aceite de motor — nivel incorrecto",M2:"Refrigerante — nivel incorrecto",M3:"Líquido de frenos — nivel incorrecto",M4:"Mangueras con daño",M5:"Fugas bajo motor",
+  H1:"Testigos activos en cuadro",H2:"Aire acondicionado inoperante",H3:"Cinturón con falla",H4:"Ventanas eléctricas con falla",
+  H5:"Habitáculo sucio",H6:"Protectores no colocados",H7:"SOAT vencido/próximo a vencer",H8:"KDM / recall pendiente",
+  L1:"Faro delantero con falla",L2:"Luz de freno con falla",L3:"Intermitente con falla",
+  V1:"Estado de carga bajo",V2:"Puerto de carga con daño",V3:"Alerta de temperatura activa",
+};
+
+const CORRECTIVE_ACTIONS={
+  E1:"Revisar protocolo de recepción fotográfica. Capacitar técnicos en manejo de carrocería durante el servicio e implementar protectores en todas las áreas de contacto.",
+  E2:"Verificar uso correcto de mascarilla y técnica de pintura. Inspeccionar el acabado antes del lavado final del vehículo.",
+  E3:"Reforzar uso de protectores de carrocería y paños de trabajo. Limpiar el área de trabajo antes de posicionar el vehículo.",
+  N1:"Calibrar y verificar manómetros disponibles en el taller. Añadir verificación de presiones como paso obligatorio en la orden de trabajo antes del cierre.",
+  N2:"Implementar medición de espesor de pastillas en cada servicio. Capacitar en criterios de reemplazo según especificación del fabricante.",
+  N3:"Verificar disponibilidad de torquímetros calibrados en el taller. Incluir confirmación del par de apriete en el control de calidad como ítem bloqueante de entrega.",
+  M1:"Revisar proceso de cambio de aceite. Verificar especificación correcta y nivel post-servicio antes de cerrar el capó.",
+  M2:"Incluir nivel de refrigerante en la lista de verificación post-servicio. Revisar posibles fugas del sistema de enfriamiento antes del cierre de la OT.",
+  M3:"Incluir nivel de líquido de frenos en la lista post-servicio. Verificar humedad y programar cambio si supera el umbral recomendado por el fabricante.",
+  M4:"Inspeccionar mangueras durante cada servicio preventivo. Documentar condición en la OT y alertar al cliente si existe riesgo inminente.",
+  M5:"Revisar proceso de ajuste de tapones y empaques. Implementar inspección visual de fugas antes de bajar el vehículo del elevador.",
+  H1:"Realizar lectura de diagnóstico con escáner antes de entregar el vehículo. No entregar con códigos activos sin justificación técnica documentada en la OT.",
+  H2:"Verificar carga de gas refrigerante y funcionamiento del compresor. Incluir prueba de climatización en el recorrido de calidad como ítem obligatorio.",
+  H3:"Añadir verificación de cinturones al protocolo de revisión del habitáculo. Reemplazar si hay daño físico visible en algún punto del recorrido.",
+  H4:"Probar subida/bajada y función de seguridad en todas las ventanas. Verificar fusibles y módulo de control si se detecta alguna falla.",
+  H5:"Reforzar protocolo de limpieza antes de la entrega. El técnico debe verificar baúl, consola central y porta-objetos antes de llamar al controlador.",
+  H6:"Capacitar técnicos en el uso de protectores desde el inicio del trabajo, no al final. El controlador verifica que estén colocados antes de iniciar.",
+  H7:"Revisar vigencia del seguro obligatorio al recibir el vehículo. Informar proactivamente al cliente si vence en menos de 30 días.",
+  H8:"Consultar boletines o campañas del fabricante antes de cada entrega. Documentar en la OT si aplica o no aplica al vehículo inspeccionado.",
+  L1:"Probar faros como parte del recorrido de calidad. Verificar alineación si fueron desmontados o si se intervino la carrocería frontal.",
+  L2:"Verificar las tres luces de freno incluyendo la tercera. Usar cámara trasera o una segunda persona para confirmar durante el recorrido.",
+  L3:"Incluir verificación de intermitentes en el recorrido de iluminación. Probar modo de emergencia y señal de giro izquierda y derecha.",
+  V1:"Establecer protocolo de carga mínima antes de entrega (recomendado mínimo 20%). Si la entrega es urgente, coordinar con el cliente y documentar el acuerdo.",
+  V2:"Inspeccionar el puerto de carga al recibir el vehículo. Documentar estado en la OT de recepción para evitar disputas posteriores.",
+  V3:"Verificar alertas del sistema de gestión de batería con escáner antes de cerrar la OT. No entregar con alertas activas de temperatura o aislamiento.",
+};
+
+// Helpers para configuración del taller (localStorage)
+const getTallerConfig=()=>{try{return JSON.parse(localStorage.getItem("cp_config")||"{}");}catch{return{};}};
+const saveTallerConfig=(cfg)=>{try{localStorage.setItem("cp_config",JSON.stringify(cfg));}catch{}};
+const getTallerName=()=>getTallerConfig().tallerName||"";
+const getDefaultInspector=()=>getTallerConfig().inspector||"";
+
+// ══════════════════════════════════════════════════════════════════════════
+// POSICIONES DE INSPECCIÓN (orden físico)
+// ══════════════════════════════════════════════════════════════════════════
+const POSITIONS=[
+  {
+    id:1,key:"E",short:"Ext.",name:"Recorrido exterior",
+    color:C.purple,light:C.purpleLt,dark:C.purpleDk,
+    items:[
+      {id:"E1",text:"Daños de carrocería — sin daños nuevos vs. estado de recepción"},
+      {id:"E2",text:"Desperfectos en pintura — sin borde de mascarilla ni cáscara de naranja"},
+      {id:"E3",text:"Limpieza exterior — sin grasa, huellas ni residuos de taller"},
+    ]
+  },
+  {
+    id:2,key:"N",short:"Neum.",name:"Neumáticos y frenos",
+    color:C.green,light:C.greenLt,dark:C.greenXdk,
+    items:[
+      {id:"N1",text:"Presión de neumáticos",field:"Presión de entrega: _________ psi"},
+      {id:"N2",text:"Pastillas y discos — visual por rueda, sin fisuras ni desgaste crítico"},
+      {id:"N3",text:"Tuerca de rueda con torquímetro al par especificado"},
+    ]
+  },
+  {
+    id:3,key:"M",short:"Motor",name:"Compartimiento motor",
+    color:C.amber,light:C.amberLt,dark:C.amberDk,
+    items:[
+      {id:"M1",text:"Aceite de motor — nivel entre MIN y MÁX, sin contaminación"},
+      {id:"M2",text:"Refrigerante — nivel correcto, sin turbidez ni olor quemado"},
+      {id:"M3",text:"Líquido de frenos — nivel entre MIN y MÁX"},
+      {id:"M4",text:"Mangueras — sin grietas, deformaciones ni fugas"},
+      {id:"M5",text:"Fugas — zona bajo motor seca, sin rastro de aceite o refrigerante"},
+    ]
+  },
+  {
+    id:4,key:"H",short:"Hab.",name:"Habitáculo",
+    color:C.blue,light:C.blueLt,dark:C.blueDk,
+    items:[
+      {id:"H1",text:"Testigos — sin advertencias activas en cuadro de instrumentos"},
+      {id:"H2",text:"Aire acondicionado — temperatura alcanzada en menos de 3 min"},
+      {id:"H3",text:"Cinturones — todos los puestos operativos y sin daño visible"},
+      {id:"H4",text:"Ventanas eléctricas — subida/bajada y función antiatrapamiento"},
+      {id:"H5",text:"Limpieza interior — sin herramientas, trapos ni residuos de taller"},
+      {id:"H6",text:"Protectores — verificar que estén puestos en asiento y volante"},
+      {id:"H7",text:"SOAT — vigente (informar al cliente si está próximo a vencer)"},
+      {id:"H8",text:"KDM o recall — verificar si existe campaña activa para este vehículo"},
+    ]
+  },
+  {
+    id:5,key:"L",short:"Ilum.",name:"Iluminación exterior",
+    color:C.teal,light:C.tealLt,dark:C.tealDk,
+    items:[
+      {id:"L1",text:"Faros delanteros — luz corta y larga operativas, sin humedad interna"},
+      {id:"L2",text:"Luces de freno — las tres activas incluyendo la tercera luz de freno"},
+      {id:"L3",text:"Intermitentes — izquierda, derecha y emergencia con destelleo correcto"},
+    ]
+  },
+  {
+    id:6,key:"V",short:"EV",name:"EV / PHEV",
+    color:C.amber,light:C.amberLt,dark:C.amberDk,
+    ev:true,
+    items:[
+      {id:"V1",text:"Estado de carga de la batería de alta tensión",field:"% de carga: _________%"},
+      {id:"V2",text:"Puerto de carga — sin daño en contactos y carga correctamente"},
+      {id:"V3",text:"Alertas de temperatura — sin alertas activas de batería o motor eléctrico"},
+    ]
+  },
+];
+
+// ── ICONOS ────────────────────────────────────────────────────────────────
+const paths={
+  check:"M4 12l5 5L20 7",close:"M18 6L6 18M6 6l12 12",
+  shield:"M12 3l7 4v5c0 5-4 9-7 10C9 21 5 17 5 12V7l7-4z",
+  car:"M5 17H3v-5l2-5h14l2 5v5h-2M5 17a2 2 0 104 0 2 2 0 00-4 0M15 17a2 2 0 104 0 2 2 0 00-4 0",
+  history:"M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
+  settings:"M4 21v-7M4 10V3M12 21v-4M12 13V3M20 21v-8M20 9V3M1 14h6M9 17h6M17 12h6",
+  plus:"M12 5v14M5 12h14",arrowL:"M19 12H5M11 18l-6-6 6-6",arrowR:"M5 12h14M13 6l6 6-6 6",
+  lock:"M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4",
+  search:"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
+  chart:"M18 20V10M12 20V4M6 20v-6",
+  file:"M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8",
+  trend:"M23 6l-9.5 9.5-5-5L1 18",
+  warn:"M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z",
+  calendar:"M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z",
+  filter:"M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
+  bolt:"M13 2L3 14h9l-1 8 10-12h-9l1-8z",
+  chevD:"M6 9l6 6 6-6",
+  user:"M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z",
+  tag:"M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01",
+  eye:"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 100-6 3 3 0 000 6z",
+};
+const Icon=({n,size=20,color="currentColor"})=>(
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={paths[n]}/>
+  </svg>
+);
+const Logo=({size=30})=>(
+  <div style={{display:"flex",alignItems:"center",gap:9}}>
+    <div style={{width:size,height:size,borderRadius:7,background:C.green,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <Icon n="check" size={size*0.56} color={C.navy}/>
+    </div>
+    <span style={{fontSize:size*0.63,fontWeight:800,letterSpacing:-0.5,color:C.white,lineHeight:1}}>
+      Check<span style={{color:C.green}}>Pit</span>
+    </span>
+  </div>
+);
+
+// ── CAMPOS ────────────────────────────────────────────────────────────────
+function TextField({label,value,onChange,onBlur,placeholder,touched,error,mono,maxLength,icon}){
+  const ok=touched&&value&&!error;
+  return(
+    <div>
+      <label style={{fontSize:11,fontWeight:700,letterSpacing:1.2,color:C.textLt,textTransform:"uppercase",display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
+        {icon&&<Icon n={icon} size={13} color={C.textLt}/>}{label}<span style={{color:C.red,marginLeft:1}}>*</span>
+      </label>
+      <div style={{position:"relative"}}>
+        <input value={value} onChange={onChange} onBlur={onBlur} placeholder={placeholder} maxLength={maxLength}
+          style={{width:"100%",border:`1.5px solid ${error?C.red:ok?C.green:C.border}`,borderRadius:9,padding:"13px 14px",fontSize:15,background:error?C.redLt:C.surface,outline:"none",color:C.text,fontFamily:mono?"monospace":"inherit",letterSpacing:mono?1:0,transition:"border-color 0.15s"}}/>
+        {ok&&<span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><Icon n="check" size={16} color={C.green}/></span>}
+      </div>
+      {error&&<div style={{fontSize:12,color:C.red,marginTop:5,display:"flex",alignItems:"center",gap:5}}><Icon n="close" size={12} color={C.red}/>{error}</div>}
+    </div>
+  );
+}
+function SelectField({label,value,onChange,options,icon}){
+  return(
+    <div>
+      <label style={{fontSize:11,fontWeight:700,letterSpacing:1.2,color:C.textLt,textTransform:"uppercase",display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
+        {icon&&<Icon n={icon} size={13} color={C.textLt}/>}{label}
+      </label>
+      <div style={{position:"relative"}}>
+        <select value={value} onChange={onChange} style={{width:"100%",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"13px 36px 13px 14px",fontSize:15,background:C.surface,outline:"none",color:C.text,cursor:"pointer"}}>
+          {options.map(o=><option key={o} value={o}>{o}</option>)}
+        </select>
+        <span style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><Icon n="chevD" size={16} color={C.textLt}/></span>
+      </div>
+    </div>
+  );
+}
+
+// ── SPLASH ────────────────────────────────────────────────────────────────
+function Splash({onDone}){
+  useEffect(()=>{const t=setTimeout(onDone,2000);return()=>clearTimeout(t);},[]);
+  return(
+    <div style={{minHeight:"100vh",background:C.navy,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20}}>
+      <div style={{width:90,height:90,borderRadius:22,background:C.green,display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <Icon n="check" size={46} color={C.navy}/>
+      </div>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:36,fontWeight:800,color:C.white,letterSpacing:-1,lineHeight:1}}>Check<span style={{color:C.green}}>Pit</span></div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:6,letterSpacing:3,textTransform:"uppercase"}}>Control Final de Taller</div>
+      </div>
+      <div style={{display:"flex",gap:5,marginTop:4}}>
+        {[0,1,2].map(i=><div key={i} style={{width:i===1?18:5,height:5,borderRadius:3,background:i===1?C.green:"rgba(255,255,255,0.2)"}}/>)}
+      </div>
+    </div>
+  );
+}
+
+// ── ACTIVACIÓN ────────────────────────────────────────────────────────────
+function Activation({onActivate}){
+  const[code,setCode]=useState("");
+  const[error,setError]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[success,setSuccess]=useState(false);
+  const go=()=>{
+    const k=code.trim().toUpperCase();
+    if(!k){setError("Ingresa tu código de licencia.");return;}
+    setLoading(true);setError("");
+    setTimeout(()=>{
+      const rule=LICENSE_RULES[k];
+      if(!rule){setError("Código inválido. Verifica que lo copiaste correctamente.");setLoading(false);return;}
+      const used=ACTIVATIONS[k]||[];
+      let devId=localStorage.getItem("cp_device_id");
+      if(!devId){devId="dev_"+Math.random().toString(36).slice(2,10);localStorage.setItem("cp_device_id",devId);}
+      if(!used.includes(devId)&&localStorage.getItem("cp_license")!==k&&used.length>=rule.maxDevices){
+        setError("Este código ya alcanzó el límite de dispositivos. Contacta a CheckPit.");setLoading(false);return;
+      }
+      localStorage.setItem("cp_license",k);setSuccess(true);
+      setTimeout(()=>onActivate(k,rule),1100);
+    },1000);
+  };
+  return(
+    <div style={{minHeight:"100vh",background:C.navy,display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"28px 24px 32px",borderBottom:`1px solid ${C.navyLt}`}}>
+        <Logo size={32}/>
+        <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginTop:8,marginLeft:41,letterSpacing:2,textTransform:"uppercase"}}>Control Final de Taller</div>
+      </div>
+      <div style={{flex:1,padding:"32px 24px",display:"flex",flexDirection:"column",gap:24,maxWidth:420,margin:"0 auto",width:"100%"}}>
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}><Icon n="lock" size={20} color={C.green}/><span style={{fontSize:20,fontWeight:700,color:C.white}}>Activar licencia</span></div>
+          <p style={{fontSize:14,color:"rgba(255,255,255,0.6)",margin:0,lineHeight:1.7}}>Ingresa el código que recibiste al adquirir CheckPit. Se activa una sola vez en este dispositivo.</p>
+        </div>
+        <div style={{background:C.navyMd,borderRadius:14,border:`1px solid ${C.navyLt}`,padding:"22px"}}>
+          <label style={{fontSize:10,fontWeight:700,letterSpacing:2,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",display:"block",marginBottom:12}}>Código de licencia</label>
+          <input value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setError("");}} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="CHECKPIT-XXXX"
+            style={{width:"100%",border:`1.5px solid ${error?C.red:code?C.green:C.navyLt}`,borderRadius:10,padding:"14px",fontSize:17,fontFamily:"monospace",letterSpacing:2,background:C.navyLt,outline:"none",color:C.white,transition:"border-color 0.2s",marginBottom:error||success?12:0}}/>
+          {error&&<div style={{display:"flex",alignItems:"flex-start",gap:7,color:C.red,fontSize:13,lineHeight:1.5,marginBottom:12}}><span style={{flexShrink:0,marginTop:1}}><Icon n="close" size={14} color={C.red}/></span>{error}</div>}
+          {success&&<div style={{display:"flex",alignItems:"center",gap:7,color:C.green,fontSize:13,fontWeight:600,marginBottom:12}}><Icon n="check" size={14} color={C.green}/>Licencia válida. Activando…</div>}
+          <button onClick={go} disabled={loading} style={{width:"100%",marginTop:4,padding:"15px",borderRadius:10,border:"none",background:success?C.greenDk:C.green,color:C.navy,fontSize:15,fontWeight:700,cursor:loading?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:loading?0.7:1,transition:"all 0.2s"}}>
+            {success?<><Icon n="check" size={18} color={C.navy}/>Activado</>:loading?"Verificando…":<><Icon n="shield" size={18} color={C.navy}/>Activar CheckPit</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── NUEVA INSPECCIÓN ──────────────────────────────────────────────────────
+function NewInspection({onBack,onStart}){
+  const[placa,setPlaca]=useState("");
+  const[ot,setOt]=useState("");
+  const[model,setModel]=useState("");
+  const[inspector,setInspector]=useState(getDefaultInspector());
+  const[motivo,setMotivo]=useState(MOTIVOS[0]);
+  const[isEV,setIsEV]=useState(false);
+  const[touched,setTouched]=useState({});
+  const t=(k)=>()=>setTouched(p=>({...p,[k]:true}));
+  const errPlaca=touched.placa&&placa.trim().length<3?"Mínimo 3 caracteres":"";
+  const errOt=touched.ot&&!ot.trim()?"Campo obligatorio":"";
+  const errInspector=touched.inspector&&!inspector.trim()?"Campo obligatorio":"";
+  const canStart=placa.trim().length>=3&&ot.trim()&&inspector.trim();
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,display:"flex",flexDirection:"column",paddingBottom:90}}>
+      <div style={{background:C.navy,padding:"0 18px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 0 14px"}}>
+          <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}><Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/></button>
+          <div style={{flex:1}}><div style={{fontSize:16,fontWeight:700,color:C.white}}>Nueva inspección</div><div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>Paso 1 de 3 · Datos del vehículo</div></div>
+          <div style={{display:"flex",gap:5}}>{[1,2,3].map(s=><div key={s} style={{width:s===1?18:6,height:6,borderRadius:3,background:s===1?C.green:"rgba(255,255,255,0.25)"}}/>)}</div>
+        </div>
+        <div style={{height:2,background:"rgba(255,255,255,0.1)",borderRadius:1}}><div style={{height:2,width:"33%",background:C.green,borderRadius:1}}/></div>
+      </div>
+      <div style={{padding:"20px 16px",display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 16px",display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:12,borderBottom:`1px solid ${C.border}`}}>
+            <div style={{width:30,height:30,borderRadius:7,background:C.greenLt,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon n="tag" size={15} color={C.greenDk}/></div>
+            <span style={{fontSize:14,fontWeight:700,color:C.text}}>Identificación del vehículo</span>
+          </div>
+          <TextField label="Placa" value={placa} placeholder="ABC123" mono maxLength={6}
+            onChange={e=>setPlaca(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6))}
+            onBlur={t("placa")} touched={touched.placa} error={errPlaca} icon="tag"/>
+          <TextField label="N° Orden de Trabajo" value={ot} placeholder="OT-2026-0001" mono maxLength={20}
+            onChange={e=>setOt(e.target.value.toUpperCase().slice(0,20))}
+            onBlur={t("ot")} touched={touched.ot} error={errOt} icon="file"/>
+          <div>
+            <label style={{fontSize:11,fontWeight:700,letterSpacing:1.2,color:C.textLt,textTransform:"uppercase",display:"block",marginBottom:7}}>Modelo</label>
+            <input value={model} onChange={e=>setModel(e.target.value)} placeholder="GLC 300"
+              style={{width:"100%",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"13px 14px",fontSize:15,background:C.surface,outline:"none",color:C.text}}/>
+          </div>
+        </div>
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 16px",display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:12,borderBottom:`1px solid ${C.border}`}}>
+            <div style={{width:30,height:30,borderRadius:7,background:C.blueLt,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon n="user" size={15} color={C.blue}/></div>
+            <span style={{fontSize:14,fontWeight:700,color:C.text}}>Inspector y motivo de visita</span>
+          </div>
+          <TextField label="Inspector" value={inspector} placeholder="Nombre del inspector" maxLength={50}
+            onChange={e=>setInspector(e.target.value)} onBlur={t("inspector")} touched={touched.inspector} error={errInspector} icon="user"/>
+          <SelectField label="Motivo de visita" value={motivo} onChange={e=>setMotivo(e.target.value)} options={MOTIVOS} icon="tag"/>
+        </div>
+        <div onClick={()=>setIsEV(v=>!v)} style={{background:isEV?C.navy:C.white,borderRadius:14,border:`1.5px solid ${isEV?C.green:C.border}`,padding:"16px",display:"flex",alignItems:"center",gap:14,cursor:"pointer",transition:"all 0.2s"}}>
+          <div style={{width:42,height:42,borderRadius:10,background:isEV?C.green:C.amberLt,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.2s"}}>
+            <Icon n="bolt" size={22} color={isEV?C.navy:C.amber}/>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:700,color:isEV?C.white:C.text}}>Vehículo eléctrico o híbrido</div>
+            <div style={{fontSize:12,color:isEV?"rgba(255,255,255,0.6)":C.textLt,marginTop:2}}>Activa la inspección adicional para vehículo eléctrico o híbrido</div>
+          </div>
+          <div style={{width:46,height:26,borderRadius:13,background:isEV?C.green:"rgba(0,0,0,0.08)",position:"relative",flexShrink:0,transition:"background 0.2s",border:`1px solid ${isEV?C.greenDk:C.border}`}}>
+            <div style={{position:"absolute",top:3,left:isEV?23:3,width:18,height:18,borderRadius:9,background:isEV?C.navy:C.textLt,transition:"left 0.2s"}}/>
+          </div>
+        </div>
+
+        {!canStart&&Object.keys(touched).length>0&&(
+          <div style={{background:C.amberLt,borderRadius:10,border:`1px solid rgba(245,166,35,0.4)`,padding:"11px 14px",display:"flex",alignItems:"center",gap:8}}>
+            <Icon n="warn" size={16} color={C.amberDk}/><span style={{fontSize:13,color:C.amberDk}}>Completa los campos marcados con <strong>*</strong> para continuar.</span>
+          </div>
+        )}
+      </div>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,padding:"12px 16px 20px",background:C.white,borderTop:`1px solid ${C.border}`}}>
+        <button onClick={()=>{setTouched({placa:true,ot:true,inspector:true});if(canStart)onStart({placa,ot,model,inspector,motivo,isEV,fecha:TODAY});}}
+          style={{width:"100%",padding:"15px",borderRadius:12,border:"none",background:canStart?C.navy:"#B8C4CE",color:C.white,fontSize:15,fontWeight:700,cursor:canStart?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:10,transition:"background 0.2s"}}>
+          {canStart?"Iniciar inspección →":"Completa los campos obligatorios"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTE 3 — CHECKLIST POR POSICIÓN FÍSICA
+// ══════════════════════════════════════════════════════════════════════════
+function ChecklistScreen({inspection,onBack,onFinish}){
+  const{vehicle}=inspection;
+  const activePos=POSITIONS.filter(p=>!p.ev||vehicle.isEV);
+  const[posIdx,setPosIdx]=useState(0);
+  const[checks,setChecks]=useState({});
+  const[meas,setMeas]=useState({});
+
+  const pos=activePos[posIdx];
+  const items=pos.items;
+  const done=items.filter(it=>checks[it.id]).length;
+  const pct=items.length?Math.round(done/items.length*100):0;
+  const canNext=done===items.length;
+  const isLast=posIdx===activePos.length-1;
+  const pendientes=items.length-done;
+
+  const toggle=(id,val)=>setChecks(p=>({...p,[id]:p[id]===val?null:val}));
+
+  const handleNext=()=>{
+    if(!canNext)return;
+    if(isLast){
+      const nos=Object.entries(checks).filter(([,v])=>v==="no").map(([k])=>k);
+      onFinish({vehicle,checks,meas,nos});
+    }else{
+      setPosIdx(i=>i+1);
+      window.scrollTo({top:0,behavior:"smooth"});
+    }
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,paddingBottom:96}}>
+      {/* Header sticky */}
+      <div style={{background:C.navy,position:"sticky",top:0,zIndex:10}}>
+        <div style={{padding:"13px 18px 10px",display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}>
+            <Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/>
+          </button>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginBottom:2}}>{vehicle.placa}{vehicle.model?` · ${vehicle.model}`:""} · {vehicle.motivo}</div>
+            <div style={{fontSize:15,fontWeight:700,color:C.white,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{color:pos.color}}>{pos.id}.</span>
+              <span>{pos.name}</span>
+            </div>
+          </div>
+          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:9,padding:"6px 12px",textAlign:"center",flexShrink:0}}>
+            <div style={{fontSize:16,fontWeight:800,color:pos.color,lineHeight:1}}>{done}<span style={{fontSize:11,color:"rgba(255,255,255,0.4)"}}>/{items.length}</span></div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.4)",marginTop:1}}>ítems</div>
+          </div>
+        </div>
+
+        {/* Tabs de posición */}
+        <div style={{display:"flex",borderTop:`1px solid rgba(255,255,255,0.08)`}}>
+          {activePos.map((p,i)=>{
+            const past=i<posIdx,active=i===posIdx;
+            return(
+              <div key={p.id} style={{flex:1,padding:"8px 2px",textAlign:"center",borderBottom:`2.5px solid ${active?p.color:"transparent"}`,transition:"border-color 0.2s"}}>
+                <div style={{fontSize:12,fontWeight:700,color:active?p.color:past?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.22)",display:"flex",alignItems:"center",justifyContent:"center",gap:3}}>
+                  {past?<span style={{fontSize:10}}>✓</span>:<span>{p.id}</span>}
+                </div>
+                <div style={{fontSize:9,color:active?p.color:"rgba(255,255,255,0.25)",marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",padding:"0 2px"}}>{p.short}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Barra de progreso */}
+        <div style={{height:3,background:"rgba(255,255,255,0.1)"}}>
+          <div style={{height:3,width:`${pct}%`,background:pos.color,transition:"width 0.3s"}}/>
+        </div>
+      </div>
+
+      {/* Ítems */}
+      <div style={{padding:"14px 16px"}}>
+        {items.map((item,idx)=>{
+          const st=checks[item.id];
+          const cardBg=st==="ok"?pos.light:st==="no"?C.redLt:st==="na"?"#F2F2F2":C.white;
+          const cardBorder=st==="ok"?pos.color:st==="no"?C.red:st==="na"?"#BBBBBB":C.border;
+          return(
+            <div key={item.id} style={{background:cardBg,borderRadius:13,border:`1.5px solid ${cardBorder}`,padding:"14px",marginBottom:9,transition:"all 0.15s"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:12}}>
+                <span style={{fontSize:11,fontWeight:800,color:pos.color,flexShrink:0,paddingTop:2,minWidth:22}}>{idx+1}</span>
+                <span style={{fontSize:14,color:C.text,lineHeight:1.55,flex:1}}>{item.text}</span>
+                {st&&(
+                  <span style={{flexShrink:0,marginTop:2}}>
+                    {st==="ok"&&<Icon n="check" size={17} color={pos.color}/>}
+                    {st==="no"&&<Icon n="close" size={17} color={C.red}/>}
+                    {st==="na"&&<span style={{fontSize:12,color:"#AAA",fontWeight:700}}>N/A</span>}
+                  </span>
+                )}
+              </div>
+              {item.field&&(
+                <input value={meas[item.id]||""} onChange={e=>setMeas(p=>({...p,[item.id]:e.target.value}))}
+                  placeholder={item.field}
+                  style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"10px 12px",fontSize:14,fontFamily:"monospace",background:"rgba(255,255,255,0.8)",outline:"none",color:C.text,marginBottom:12}}/>
+              )}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+                {[
+                  {val:"ok",label:"OK", sym:"✓",selColor:pos.color,selBg:pos.light,selTxt:pos.dark},
+                  {val:"no",label:"NO", sym:"✗",selColor:C.red,    selBg:C.redLt, selTxt:C.redDk},
+                  {val:"na",label:"N/A",sym:"—",selColor:"#AAA",   selBg:"#EFEFEF",selTxt:"#555"},
+                ].map(({val,label,sym,selColor,selBg,selTxt})=>{
+                  const sel=st===val;
+                  return(
+                    <button key={val} onClick={()=>toggle(item.id,val)} style={{padding:"12px 4px",borderRadius:9,border:`1.5px solid ${sel?selColor:C.border}`,background:sel?selBg:"rgba(255,255,255,0.55)",color:sel?selTxt:C.textLt,fontSize:14,fontWeight:sel?700:500,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,transition:"all 0.15s"}}>
+                      <span style={{fontSize:15}}>{sym}</span><span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+
+        {canNext&&(
+          <div style={{background:C.greenLt,borderRadius:13,border:`1.5px solid ${C.green}`,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,marginTop:4}}>
+            <div style={{width:36,height:36,borderRadius:10,background:C.green,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon n="check" size={19} color={C.navy}/></div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:C.greenXdk}}>Posición {pos.id} completa</div>
+              <div style={{fontSize:12,color:C.greenDk,marginTop:1}}>{isLast?"Listo para ver el resultado.":"Continúa con la siguiente posición."}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,padding:"10px 16px 20px",background:C.white,borderTop:`1px solid ${C.border}`}}>
+        {!canNext&&<div style={{textAlign:"center",fontSize:12,color:C.textLt,marginBottom:8}}>{pendientes} ítem{pendientes!==1?"s":""} pendiente{pendientes!==1?"s":""}</div>}
+        <button onClick={handleNext} style={{width:"100%",padding:"15px",borderRadius:12,border:"none",background:canNext?pos.color:"#B8C4CE",color:canNext?pos.dark:C.white,fontSize:15,fontWeight:700,cursor:canNext?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background 0.2s"}}>
+          {canNext
+            ?(isLast?<><Icon n="check" size={18} color={pos.dark}/>Ver resultado</>:`Continuar: ${activePos[posIdx+1].id}. ${activePos[posIdx+1].name} →`)
+            :`Completa los ${pendientes} ítems restantes`
+          }
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DETALLE DE INSPECCIÓN
+// ══════════════════════════════════════════════════════════════════════════
+function InspectionDetail({record,onBack,licenseInfo}){
+  const[pdfState,setPdfState]=useState("idle");
+
+  const handlePDF=()=>{
+    if(!window.jspdf){setPdfState("error");return;}
+    setPdfState("loading");
+    // Construir objeto de inspección compatible con generatePDF
+    // (registros históricos del MOCK no tienen checks completos)
+    const pdfInspection={
+      vehicle:{
+        placa:record.placa,ot:record.ot,model:record.model||"—",
+        inspector:record.inspector||"—",motivo:record.motivo||"—",
+        isEV:record.isEV||false,fecha:record.date,
+      },
+      checks:record.checks||{},
+      meas:record.meas||{},
+      nos:record.nos||[],
+    };
+    setTimeout(()=>{
+      const ok=generatePDF(pdfInspection,licenseInfo?.taller||"");
+      setPdfState(ok?"done":"error");
+      setTimeout(()=>setPdfState("idle"),3000);
+    },80);
+  };
+  const resultMeta={
+    ok:  {label:"Aprobado",           color:C.greenDk,  bg:C.greenLt,  icon:"check"},
+    warn:{label:"Aprobado con observaciones",color:C.amberDk,bg:C.amberLt,icon:"warn"},
+    fail:{label:"Rechazado",           color:C.red,      bg:C.redLt,   icon:"close"},
+  };
+  const m=resultMeta[record.result];
+  const okCount=record.nos?0:0;
+  const noCount=record.nos?.length||0;
+
+  // Agrupar NOs por posición
+  const grouped={};
+  (record.nos||[]).forEach(id=>{
+    const pos=POSITIONS.find(p=>p.items.some(it=>it.id===id));
+    if(pos){
+      if(!grouped[pos.id])grouped[pos.id]={pos,items:[]};
+      grouped[pos.id].items.push(id);
+    }
+  });
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,paddingBottom:24}}>
+      {/* Header */}
+      <div style={{background:C.navy,padding:"0 18px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 0 14px"}}>
+          <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}><Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/></button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:17,fontWeight:800,color:C.white}}>{record.placa}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>{record.ot} · {record.date}</div>
+          </div>
+          <div style={{background:m.bg,borderRadius:9,padding:"6px 12px"}}>
+            <span style={{fontSize:11,fontWeight:700,color:m.color}}>{m.label}</span>
+          </div>
+        </div>
+        <div style={{height:2,background:m.color,opacity:0.7,marginBottom:0}}/>
+      </div>
+
+      <div style={{padding:"16px"}}>
+        {/* Datos del vehículo */}
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"16px",marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.textLt,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>Datos del vehículo</div>
+          {[
+            ["Modelo",   record.model||"—"],
+            ["Inspector",record.inspector||"—"],
+            ["Motivo",   record.motivo||"—"],
+            ["Fecha",    record.date],
+          ].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:13,color:C.textLt}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.text}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Resumen */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+          <div style={{background:C.greenLt,borderRadius:12,border:`1px solid ${C.green}40`,padding:"14px",textAlign:"center"}}>
+            <div style={{fontSize:28,fontWeight:800,color:C.greenXdk}}>{POSITIONS.reduce((a,p)=>a+p.items.length,0)-noCount}</div>
+            <div style={{fontSize:11,color:C.greenDk,marginTop:2}}>Ítems aprobados</div>
+          </div>
+          <div style={{background:noCount>0?C.redLt:C.greenLt,borderRadius:12,border:`1px solid ${noCount>0?C.red:C.green}40`,padding:"14px",textAlign:"center"}}>
+            <div style={{fontSize:28,fontWeight:800,color:noCount>0?C.red:C.greenXdk}}>{noCount}</div>
+            <div style={{fontSize:11,color:noCount>0?C.redDk:C.greenDk,marginTop:2}}>No conformidades</div>
+          </div>
+        </div>
+
+        {/* No conformidades */}
+        {noCount>0?(
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>Detalle de no conformidades</div>
+            {Object.values(grouped).map(({pos,items})=>(
+              <div key={pos.id} style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden",marginBottom:10}}>
+                <div style={{background:pos.light,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,borderBottom:`1px solid ${pos.color}30`}}>
+                  <div style={{width:22,height:22,borderRadius:6,background:pos.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:11,fontWeight:800,color:C.white}}>{pos.id}</span>
+                  </div>
+                  <span style={{fontSize:13,fontWeight:700,color:pos.dark}}>{pos.name}</span>
+                </div>
+                {items.map((id,i)=>(
+                  <div key={id} style={{padding:"11px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:i<items.length-1?`1px solid ${C.border}`:"none"}}>
+                    <div style={{width:7,height:7,borderRadius:"50%",background:C.red,flexShrink:0}}/>
+                    <span style={{fontSize:13,color:C.text}}>{ITEM_LABELS[id]||id}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ):(
+          <div style={{background:C.greenLt,borderRadius:13,border:`1.5px solid ${C.green}`,padding:"22px",textAlign:"center"}}>
+            <div style={{width:48,height:48,borderRadius:12,background:C.green,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}}>
+              <Icon n="check" size={26} color={C.navy}/>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:C.greenXdk}}>Inspección sin no conformidades</div>
+            <div style={{fontSize:13,color:C.greenDk,marginTop:4}}>Vehículo aprobado en todos los ítems.</div>
+          </div>
+        )}
+
+        {/* Botón exportar PDF */}
+        <button onClick={handlePDF} disabled={pdfState==="loading"}
+          style={{width:"100%",marginTop:16,padding:"14px",borderRadius:12,
+            border:`1.5px solid ${pdfState==="done"?C.green:pdfState==="error"?C.red:C.border}`,
+            background:pdfState==="done"?C.greenLt:pdfState==="error"?C.redLt:C.white,
+            color:pdfState==="done"?C.greenXdk:pdfState==="error"?C.red:C.textMd,
+            fontSize:14,fontWeight:600,cursor:pdfState==="loading"?"default":"pointer",
+            display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.2s"}}>
+          {pdfState==="loading"?<><Icon n="file" size={17} color={C.textLt}/>Generando PDF…</>
+           :pdfState==="done"?<><Icon n="check" size={17} color={C.greenDk}/>PDF descargado</>
+           :pdfState==="error"?<><Icon n="close" size={17} color={C.red}/>Error al generar</>
+           :<><Icon n="file" size={17} color={C.textLt}/>Exportar PDF de esta inspección</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────
+const PAGE_SIZE=5;
+function Home({licenseInfo,onNewInspection,onHistory,onSettings,onViewDetail,refreshKey,onActionPlan}){
+  const[search,setSearch]=useState("");
+  const[dateFilter,setDateFilter]=useState("semana");
+  const[customFrom,setCustomFrom]=useState("");
+  const[customTo,setCustomTo]=useState(TODAY);
+  const[showCustom,setShowCustom]=useState(false);
+
+  // Leer inspecciones guardadas en localStorage
+  const saved=useMemo(()=>{
+    try{return JSON.parse(localStorage.getItem("cp_inspections")||"[]");}
+    catch{return [];}
+  },[refreshKey]);
+
+  // Combinar reales + demo (las reales primero, sin duplicar OT)
+  const allRecords=useMemo(()=>{
+    const savedOTs=new Set(saved.map(r=>r.ot));
+    const mockFiltered=MOCK.filter(r=>!savedOTs.has(r.ot));
+    return [...saved,...mockFiltered].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  },[saved]);
+
+  const dateMatch=useMemo(()=>{
+    if(dateFilter==="hoy")    return d=>d===TODAY;
+    if(dateFilter==="semana") return d=>d>="2026-05-17";
+    if(dateFilter==="mes")    return d=>d>="2026-05-01";
+    if(dateFilter==="custom") return d=>(!customFrom||d>=customFrom)&&(!customTo||d<=customTo);
+    return ()=>true;
+  },[dateFilter,customFrom,customTo]);
+
+  const filtered=useMemo(()=>{
+    const q=search.trim().toLowerCase();
+    return allRecords.filter(r=>dateMatch(r.date)&&(!q||r.placa.toLowerCase().includes(q)||r.ot.toLowerCase().includes(q)));
+  },[search,dateMatch,allRecords]);
+
+  const visible=filtered.slice(0,PAGE_SIZE);
+  const hasMore=filtered.length>PAGE_SIZE;
+
+  const stats=useMemo(()=>{
+    const total=filtered.length,ok=filtered.filter(r=>r.result==="ok").length;
+    return{total,tasa:total?Math.round(ok/total*100):0,nos:filtered.flatMap(r=>r.nos).length};
+  },[filtered]);
+
+  const freqObs=useMemo(()=>{
+    const counts={};
+    filtered.forEach(r=>r.nos.forEach(id=>{counts[id]=(counts[id]||0)+1;}));
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([id,n])=>({id,n,label:ITEM_LABELS[id]||id,pos:POSITIONS.find(p=>p.items.some(it=>it.id===id))}));
+  },[filtered]);
+
+  const resultMeta={
+    ok:  {label:"Aprobado",color:C.greenDk,bg:C.greenLt,icon:"check"},
+    warn:{label:"Con obs.", color:C.amberDk,bg:C.amberLt,icon:"warn"},
+    fail:{label:"Rechazado",color:C.red,    bg:C.redLt,  icon:"close"},
+  };
+  const datePills=[{k:"hoy",l:"Hoy"},{k:"semana",l:"Esta semana"},{k:"mes",l:"Este mes"},{k:"todo",l:"Todo"},{k:"custom",l:"Personalizado",icon:"filter"}];
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,display:"flex",flexDirection:"column",paddingBottom:72}}>
+      <div style={{background:C.navy}}>
+        <div style={{padding:"16px 18px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <Logo size={28}/>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{background:C.navyMd,borderRadius:8,padding:"5px 10px",display:"flex",alignItems:"center",gap:5}}>
+              <Icon n="shield" size={12} color={C.green}/><span style={{fontSize:11,color:C.green,fontWeight:600}}>{licenseInfo.type==="demo"?"DEMO":"PRO"}</span>
+            </div>
+            <button onClick={onSettings} style={{background:"none",border:"none",cursor:"pointer",padding:6}}><Icon n="settings" size={20} color="rgba(255,255,255,0.6)"/></button>
+          </div>
+        </div>
+        <div style={{padding:"14px 18px 20px"}}>
+          <button onClick={onNewInspection} style={{width:"100%",background:C.green,border:"none",borderRadius:14,padding:"15px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
+            <span style={{fontSize:16,fontWeight:700,color:C.navy}}>Nueva inspección</span>
+            <div style={{background:"rgba(13,27,42,0.15)",borderRadius:9,padding:"8px 10px"}}><Icon n="plus" size={20} color={C.navy}/></div>
+          </button>
+        </div>
+      </div>
+
+      <div style={{padding:"18px 16px",display:"flex",flexDirection:"column",gap:16}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+          {[{v:stats.total,l:"Inspecciones",c:C.text},{v:`${stats.tasa}%`,l:"Aprobación",c:stats.tasa>=90?C.greenXdk:stats.tasa>=75?C.amberDk:C.red},{v:stats.nos,l:"No conformes",c:stats.nos===0?C.textLt:C.red}].map((s,i)=>(
+            <div key={i} style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"13px 10px",textAlign:"center"}}>
+              <div style={{fontSize:22,fontWeight:700,color:s.c,lineHeight:1}}>{s.v}</div>
+              <div style={{fontSize:10,color:C.textLt,marginTop:4,lineHeight:1.2}}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <Icon n="search" size={17} color={C.textLt}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por placa u OT…"
+            style={{flex:1,border:"none",outline:"none",fontSize:14,color:C.text,background:"transparent",fontFamily:"inherit"}}/>
+          {search&&<button onClick={()=>setSearch("")} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Icon n="close" size={15} color={C.textLt}/></button>}
+        </div>
+
+        <div>
+          <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:2}}>
+            {datePills.map(({k,l,icon})=>{const active=dateFilter===k;return(
+              <button key={k} onClick={()=>{setDateFilter(k);setShowCustom(k==="custom");}} style={{flexShrink:0,padding:"7px 13px",borderRadius:20,border:`1px solid ${active?C.green:C.border}`,background:active?C.greenLt:C.white,color:active?C.greenXdk:C.textMd,fontSize:13,fontWeight:active?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
+                {icon&&<Icon n={icon} size={13} color={active?C.greenXdk:C.textMd}/>}{l}
+              </button>
+            );})}
+          </div>
+          {showCustom&&(
+            <div style={{marginTop:10,background:C.white,borderRadius:12,border:`1.5px solid ${C.green}`,padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.greenXdk,display:"flex",alignItems:"center",gap:6}}><Icon n="calendar" size={14} color={C.greenXdk}/>Selecciona el rango de fechas</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1,textTransform:"uppercase",display:"block",marginBottom:6}}>Fecha inicial</label><input type="date" value={customFrom} onChange={e=>setCustomFrom(e.target.value)} max={customTo||TODAY} style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 10px",fontSize:13,color:C.text,background:C.surface,outline:"none",cursor:"pointer"}}/></div>
+                <div><label style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1,textTransform:"uppercase",display:"block",marginBottom:6}}>Fecha final</label><input type="date" value={customTo} onChange={e=>setCustomTo(e.target.value)} min={customFrom} max={TODAY} style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 10px",fontSize:13,color:C.text,background:C.surface,outline:"none",cursor:"pointer"}}/></div>
+              </div>
+              {(customFrom||customTo)&&<div style={{fontSize:12,color:C.textMd,background:C.greenLt,borderRadius:7,padding:"7px 10px",textAlign:"center"}}>{filtered.length} inspección{filtered.length!==1?"es":""} en el período</div>}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>
+            {filtered.length} resultado{filtered.length!==1?"s":""}{search&&<span style={{color:C.textLt,fontWeight:400}}> · "{search}"</span>}
+          </div>
+          {filtered.length===0
+            ?<div style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"32px",textAlign:"center"}}><Icon n="search" size={28} color={C.textLt}/><div style={{fontSize:14,color:C.textLt,marginTop:10}}>Sin resultados para este período.</div></div>
+            :<div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {visible.map(r=>{
+                const m=resultMeta[r.result];
+                return(
+                  <div key={r.id} onClick={()=>onViewDetail(r)}
+                    style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",transition:"border-color 0.15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=C.green}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                    <div style={{width:36,height:36,borderRadius:9,background:m.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon n={m.icon} size={18} color={m.color}/></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                        <span style={{fontSize:13,fontWeight:700,color:C.text}}>{r.placa}</span>
+                        <span style={{fontSize:11,color:C.textLt}}>·</span>
+                        <span style={{fontSize:12,color:C.textMd}}>{r.ot}</span>
+                      </div>
+                      <div style={{fontSize:12,color:C.textLt}}>{r.model}{r.motivo?` · ${r.motivo}`:""}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:11,fontWeight:700,color:m.color}}>{m.label}</div>
+                      <div style={{fontSize:10,color:C.textLt,marginTop:2}}>{r.date}</div>
+                    </div>
+                    <Icon n="arrowR" size={14} color={C.textLt}/>
+                  </div>
+                );
+              })}
+              {hasMore&&<button onClick={onHistory} style={{width:"100%",padding:"11px",borderRadius:10,border:`1px solid ${C.border}`,background:C.white,color:C.textMd,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>Ver {filtered.length-PAGE_SIZE} más en historial <Icon n="arrowR" size={15} color={C.textMd}/></button>}
+            </div>
+          }
+        </div>
+
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+          <div style={{background:C.navy,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><Icon n="trend" size={17} color={C.green}/><span style={{fontSize:14,fontWeight:700,color:C.white}}>Observaciones más frecuentes</span></div>
+            <button onClick={onHistory} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><span style={{fontSize:11,color:C.green}}>Ver más</span><Icon n="arrowR" size={12} color={C.green}/></button>
+          </div>
+          {freqObs.length===0
+            ?<div style={{padding:"24px",textAlign:"center"}}><Icon n="check" size={26} color={C.greenDk}/><div style={{fontSize:13,color:C.textLt,marginTop:8}}>Sin no conformidades en el período.</div></div>
+            :<div style={{padding:"4px 0"}}>
+              {freqObs.map((obs,i)=>{
+                const pct=Math.round(obs.n/freqObs[0].n*100);
+                const pc=obs.pos?.color||C.textLt,pb=obs.pos?.light||C.surface;
+                return(
+                  <div key={obs.id} style={{padding:"11px 16px",borderBottom:i<freqObs.length-1?`1px solid ${C.border}`:"none"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:7}}>
+                      <span style={{width:22,height:22,borderRadius:6,background:pb,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:pc,flexShrink:0}}>{obs.id[0]}</span>
+                      <span style={{flex:1,fontSize:13,color:C.text,lineHeight:1.3}}>{obs.label}</span>
+                      <span style={{fontSize:13,fontWeight:700,color:C.textMd,flexShrink:0}}>{obs.n}x</span>
+                    </div>
+                    <div style={{height:4,background:C.surface,borderRadius:2,overflow:"hidden"}}><div style={{height:4,width:`${pct}%`,borderRadius:2,background:pc,transition:"width 0.3s"}}/></div>
+                  </div>
+                );
+              })}
+            </div>
+          }
+          <div style={{padding:"12px 16px",borderTop:`1px solid ${C.border}`,background:C.surface}}>
+            <button onClick={onActionPlan} style={{width:"100%",padding:"12px",borderRadius:10,background:C.navy,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <Icon n="file" size={17} color={C.green}/><span style={{fontSize:14,fontWeight:600,color:C.white}}>Generar informe con planes de acción</span></button>
+          </div>
+        </div>
+
+        <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"12px 14px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:36,height:36,borderRadius:9,background:C.greenLt,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon n="shield" size={18} color={C.greenDk}/></div>
+          <div><div style={{fontSize:13,fontWeight:700,color:C.text}}>{licenseInfo.taller}</div><div style={{fontSize:11,color:C.textLt}}>{licenseInfo.type==="demo"?"Licencia evaluación · 1 dispositivo":"Licencia activa · dispositivos del taller"}</div></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTE 5 — GENERACIÓN DE PDF
+// ══════════════════════════════════════════════════════════════════════════
+function generatePDF(inspection, tallerId){
+  try{
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+    const W=210,H=297,M=14,CW=W-M*2;
+    let y=0;
+
+    // Paleta
+    const navy=[13,27,42],white=[255,255,255],dark=[15,23,42];
+    const lgray=[241,245,249],border=[203,213,225],gray=[100,116,139];
+    const verdictMeta={
+      ok:  {label:"APROBADO",          sub:"Vehículo listo para entrega",       c:[0,126,89],  bg:[214,247,239]},
+      warn:{label:"CON OBSERVACIONES", sub:"Revisar ítems antes de entregar",   c:[159,101,6], bg:[254,243,219]},
+      fail:{label:"RECHAZADO",         sub:"No entregar — requiere corrección", c:[184,24,24], bg:[254,226,226]},
+    };
+    const posRGB={1:[124,58,237],2:[0,158,114],3:[169,108,7],4:[30,100,180],5:[10,98,140],6:[169,108,7]};
+
+    const tallerDisplay=getTallerName()||tallerId||'';
+    const{vehicle,checks,meas,nos}=inspection;
+    const verdict=nos.length===0?"ok":nos.length<=2?"warn":"fail";
+    const vm=verdictMeta[verdict];
+    const activePos=POSITIONS.filter(p=>!p.ev||vehicle.isEV);
+    const totalItems=activePos.reduce((a,p)=>a+p.items.length,0);
+    const okCount=Object.values(checks).filter(v=>v==="ok").length;
+    const naCount=Object.values(checks).filter(v=>v==="na").length;
+
+    const chkPg=(needed)=>{ if(y+needed>H-M-8){doc.addPage();y=M;} };
+    const txt=(t,x,yy,opts={})=>doc.text(String(t),x,yy,opts);
+    const setClr=(r,g,b)=>doc.setTextColor(r,g,b);
+    const setFill=(r,g,b)=>doc.setFillColor(r,g,b);
+    const setDraw=(r,g,b)=>doc.setDrawColor(r,g,b);
+
+    // ─── CABECERA ────────────────────────────────────────────────────────
+    setFill(...navy); doc.rect(0,0,W,20,'F');
+    setClr(...white);
+    doc.setFontSize(15); doc.setFont('helvetica','bold');
+    txt('CheckPit',M,9);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    txt('Control Final de Taller',M,15);
+    doc.setFontSize(8);
+    txt(tallerDisplay,W-M,9,{align:'right'});
+    txt(`Generado: ${new Date().toLocaleString('es-CO')}`,W-M,15,{align:'right'});
+    y=26;
+
+    // ─── DATOS DEL VEHÍCULO ───────────────────────────────────────────────
+    setFill(...lgray); setDraw(...border);
+    doc.rect(M,y,CW,24,'FD');
+    const col=CW/3;
+    const cells=[
+      ['PLACA',vehicle.placa],['OT',vehicle.ot],['MODELO',vehicle.model||'—'],
+      ['INSPECTOR',vehicle.inspector],['MOTIVO',vehicle.motivo],['FECHA',vehicle.fecha],
+    ];
+    cells.forEach(([label,value],i)=>{
+      const cx=M+(i%3)*col+3;
+      const cy=y+(i<3?7:17);
+      setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      txt(label,cx,cy);
+      setClr(...dark); doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+      txt(doc.splitTextToSize(String(value||'—'),col-5)[0],cx,cy+4.5);
+    });
+    y+=29;
+
+    // ─── VEREDICTO ────────────────────────────────────────────────────────
+    setFill(...vm.bg); setDraw(...vm.c); doc.setLineWidth(0.4);
+    doc.rect(M,y,CW,20,'FD'); doc.setLineWidth(0.2);
+    setFill(...vm.c); doc.rect(M,y,5,20,'F');
+    setClr(...vm.c);
+    doc.setFontSize(15); doc.setFont('helvetica','bold');
+    txt(vm.label,M+8,y+9);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    txt(vm.sub,M+8,y+15);
+    // Stats
+    [[totalItems,'TOTAL'],[okCount,'OK'],[nos.length,'NO'],[naCount,'N/A']].forEach(([v,l],i)=>{
+      const sx=W-M-86+i*22;
+      setClr(...vm.c); doc.setFontSize(14); doc.setFont('helvetica','bold');
+      txt(v,sx+9,y+10,{align:'center'});
+      setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      txt(l,sx+9,y+16,{align:'center'});
+    });
+    y+=25;
+
+    // ─── CHECKLIST POR POSICIÓN ───────────────────────────────────────────
+    setClr(...dark); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    txt('Resultado por posición de inspección',M,y); y+=5;
+
+    activePos.forEach(pos=>{
+      const pc=posRGB[pos.id]||[100,116,139];
+      const posItems=pos.items;
+      chkPg(8+posItems.length*8);
+
+      // Cabecera de posición
+      setFill(...pc); doc.rect(M,y,CW,6.5,'F');
+      setClr(...white); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+      txt(`${pos.id}.  ${pos.name.toUpperCase()}`,M+3,y+4.5); y+=6.5;
+
+      // Ítems
+      posItems.forEach((item,idx)=>{
+        chkPg(8);
+        const st=checks[item.id];
+        const rowBg=st==='ok'?[240,252,244]:st==='no'?[254,242,242]:st==='na'?[248,248,248]:white;
+        setFill(...rowBg); setDraw(...border);
+        doc.rect(M,y,CW,7,'FD');
+
+        // Número (badge coloreado)
+        setFill(...pc); doc.rect(M,y,7,7,'F');
+        setClr(...white); doc.setFontSize(7); doc.setFont('helvetica','bold');
+        txt(idx+1,M+3.5,y+4.8,{align:'center'});
+
+        // Texto del ítem
+        setClr(...dark); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+        const lines=doc.splitTextToSize(item.text,CW-22);
+        txt(lines[0],M+10,y+4.8);
+
+        // Estado (badge derecho)
+        const sl=st==='ok'?'✓ OK':st==='no'?'✗ NO':st==='na'?'N/A':'—';
+        const sc=st==='ok'?[0,126,89]:st==='no'?[184,24,24]:[150,150,150];
+        setClr(...sc); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+        txt(sl,W-M-2,y+4.8,{align:'right'});
+        y+=7;
+
+        // Medición si existe
+        if(item.field&&meas[item.id]){
+          chkPg(6);
+          setFill(250,250,250); setDraw(...border);
+          doc.rect(M,y,CW,5.5,'FD');
+          setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','italic');
+          txt(`   Medición registrada: ${meas[item.id]}`,M+10,y+3.8);
+          y+=5.5;
+        }
+      });
+      y+=3;
+    });
+
+    // ─── NO CONFORMIDADES ─────────────────────────────────────────────────
+    if(nos.length>0){
+      chkPg(16+nos.length*8);
+      y+=3;
+      setClr(...dark); doc.setFontSize(9); doc.setFont('helvetica','bold');
+      txt(`No conformidades (${nos.length})`,M,y); y+=5;
+      nos.forEach(id=>{
+        chkPg(8);
+        const pos=POSITIONS.find(p=>p.items.some(it=>it.id===id));
+        const item=pos?.items.find(it=>it.id===id);
+        setFill(254,242,242); setDraw(220,38,38);
+        doc.rect(M,y,CW,7,'FD');
+        setFill(220,38,38); doc.circle(M+4,y+3.5,1.8,'F');
+        setClr(...dark); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+        txt(doc.splitTextToSize(item?.text||ITEM_LABELS[id]||id,CW-20)[0],M+9,y+4.5);
+        const pc=posRGB[pos?.id]||[100,116,139];
+        setClr(...pc); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+        txt(pos?.name||'',W-M-2,y+4.5,{align:'right'});
+        y+=7;
+      });
+    }
+
+    // ─── FIRMAS ───────────────────────────────────────────────────────────
+    chkPg(38);
+    y+=6;
+    setDraw(...border); doc.line(M,y,W-M,y);
+    y+=6;
+    setClr(...dark); doc.setFontSize(9); doc.setFont('helvetica','bold');
+    txt('Firmas de conformidad',M,y); y+=6;
+
+    const sigW=(CW-8)/3;
+    ['Inspector / Controlador','Asesor de Servicio','Cliente'].forEach((label,i)=>{
+      const sx=M+i*(sigW+4);
+      setFill(...lgray); setDraw(...border);
+      doc.rect(sx,y,sigW,22,'FD');
+      setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      txt(label,sx+sigW/2,y+4.5,{align:'center'});
+      setDraw(...border); doc.line(sx+3,y+17,sx+sigW-3,y+17);
+      setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      txt('Nombre y firma',sx+sigW/2,y+21,{align:'center'});
+    });
+    y+=28;
+
+    // ─── PIE DE PÁGINA ────────────────────────────────────────────────────
+    const pages=doc.internal.getNumberOfPages();
+    for(let i=1;i<=pages;i++){
+      doc.setPage(i);
+      setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      txt(`Generado por CheckPit · ${vehicle.placa} · ${vehicle.ot}`,M,H-5);
+      txt(`Página ${i} de ${pages}`,W-M,H-5,{align:'right'});
+    }
+
+    doc.save(`CheckPit_${vehicle.placa}_${vehicle.ot}_${vehicle.fecha}.pdf`);
+    return true;
+  }catch(e){console.error('PDF:',e);return false;}
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTE 4 — RESULTADO DE LA INSPECCIÓN
+// ══════════════════════════════════════════════════════════════════════════
+function ResultScreen({inspection,onHome,onNewInspection,licenseInfo}){
+  const{vehicle,checks,meas,nos}=inspection;
+
+  // Veredicto
+  const noCount=nos.length;
+  const verdict=noCount===0?"ok":noCount<=2?"warn":"fail";
+  const totalItems=POSITIONS.filter(p=>!p.ev||vehicle.isEV).reduce((a,p)=>a+p.items.length,0);
+  const okCount=Object.values(checks).filter(v=>v==="ok").length;
+  const naCount=Object.values(checks).filter(v=>v==="na").length;
+
+  const verdictMeta={
+    ok:  {label:"APROBADO",          sub:"Vehículo listo para entrega",  color:C.greenDk, bg:C.greenLt, border:C.green,  icon:"check"},
+    warn:{label:"CON OBSERVACIONES", sub:"Revisar ítems antes de entregar",color:C.amberDk,bg:C.amberLt,border:C.amber,  icon:"warn"},
+    fail:{label:"RECHAZADO",         sub:"No entregar — requiere corrección",color:C.red,  bg:C.redLt,  border:C.red,    icon:"close"},
+  };
+  const vm=verdictMeta[verdict];
+
+  // Agrupar NOs por posición
+  const grouped={};
+  nos.forEach(id=>{
+    const pos=POSITIONS.find(p=>p.items.some(it=>it.id===id));
+    if(pos){if(!grouped[pos.id])grouped[pos.id]={pos,items:[]};grouped[pos.id].items.push(id);}
+  });
+
+  // Mediciones registradas
+  const measEntries=Object.entries(meas).filter(([,v])=>v&&v.trim());
+
+  // Guardar en localStorage
+  const[saved,setSaved]=useState(false);
+  const[pdfState,setPdfState]=useState("idle"); // idle | loading | done | error
+  const handlePDF=()=>{
+    if(!window.jspdf){setPdfState("error");return;}
+    setPdfState("loading");
+    setTimeout(()=>{
+      const ok=generatePDF(inspection, licenseInfo?.taller||"");
+      setPdfState(ok?"done":"error");
+      setTimeout(()=>setPdfState("idle"),3000);
+    },80);
+  };
+  const save=()=>{
+    const record={
+      id:Date.now(),
+      placa:vehicle.placa,ot:vehicle.ot,model:vehicle.model,
+      motivo:vehicle.motivo,inspector:vehicle.inspector,
+      isEV:vehicle.isEV,date:vehicle.fecha,
+      result:verdict,nos,checks,meas,
+    };
+    try{
+      const existing=JSON.parse(localStorage.getItem("cp_inspections")||"[]");
+      localStorage.setItem("cp_inspections",JSON.stringify([record,...existing].slice(0,200)));
+      setSaved(true);
+    }catch(e){console.error(e);}
+  };
+
+  // Guardar automáticamente al montar
+  useEffect(()=>{if(!saved)save();},[]);
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,paddingBottom:32}}>
+      {/* Header */}
+      <div style={{background:C.navy,padding:"0 18px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 0 14px"}}>
+          <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}>
+            <Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/>
+          </button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.white}}>Resultado de inspección</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>{vehicle.placa} · {vehicle.ot} · {vehicle.fecha}</div>
+          </div>
+          {saved&&<div style={{background:C.greenLt,borderRadius:8,padding:"5px 10px",display:"flex",alignItems:"center",gap:4}}>
+            <Icon n="check" size={12} color={C.greenDk}/>
+            <span style={{fontSize:11,color:C.greenDk,fontWeight:600}}>Guardado</span>
+          </div>}
+        </div>
+        <div style={{height:3,background:vm.border,opacity:0.8}}/>
+      </div>
+
+      <div style={{padding:"16px"}}>
+
+        {/* VEREDICTO */}
+        <div style={{background:vm.bg,borderRadius:16,border:`2px solid ${vm.border}`,padding:"24px 20px",textAlign:"center",marginBottom:16}}>
+          <div style={{width:60,height:60,borderRadius:15,background:vm.border,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
+            <Icon n={vm.icon} size={30} color={C.white}/>
+          </div>
+          <div style={{fontSize:26,fontWeight:800,color:vm.color,letterSpacing:-0.5,lineHeight:1}}>{vm.label}</div>
+          <div style={{fontSize:13,color:vm.color,opacity:0.8,marginTop:6}}>{vm.sub}</div>
+          <div style={{fontSize:12,color:vm.color,opacity:0.6,marginTop:4}}>{vehicle.placa} · {vehicle.ot}</div>
+        </div>
+
+        {/* ESTADÍSTICAS */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:16}}>
+          {[
+            {v:totalItems,l:"Total",    c:C.textMd},
+            {v:okCount,   l:"OK",       c:C.greenXdk},
+            {v:noCount,   l:"NO",       c:noCount>0?C.red:C.textLt},
+            {v:naCount,   l:"N/A",      c:C.textLt},
+          ].map((s,i)=>(
+            <div key={i} style={{background:C.white,borderRadius:10,border:`1px solid ${C.border}`,padding:"11px 6px",textAlign:"center"}}>
+              <div style={{fontSize:20,fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div>
+              <div style={{fontSize:10,color:C.textLt,marginTop:3}}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* DATOS DEL VEHÍCULO */}
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"14px 16px",marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.textLt,letterSpacing:1.5,textTransform:"uppercase",marginBottom:12}}>Datos del vehículo</div>
+          {[
+            ["Inspector", vehicle.inspector],
+            ["Motivo",    vehicle.motivo],
+            ["Modelo",    vehicle.model||"—"],
+            ["Fecha",     vehicle.fecha],
+            vehicle.isEV&&["EV / PHEV","Módulo adicional aplicado"],
+          ].filter(Boolean).map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:13,color:C.textLt}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.text}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* MEDICIONES REGISTRADAS */}
+        {measEntries.length>0&&(
+          <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,overflow:"hidden",marginBottom:14}}>
+            <div style={{padding:"12px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:8}}>
+              <Icon n="file" size={15} color={C.textLt}/>
+              <span style={{fontSize:12,fontWeight:700,color:C.textLt,letterSpacing:1.2,textTransform:"uppercase"}}>Mediciones registradas</span>
+            </div>
+            {measEntries.map(([id,val])=>{
+              const pos=POSITIONS.find(p=>p.items.some(it=>it.id===id));
+              const item=pos?.items.find(it=>it.id===id);
+              return(
+                <div key={id} style={{padding:"11px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:6,height:6,borderRadius:"50%",background:pos?.color||C.textLt,flexShrink:0}}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,color:C.textMd}}>{item?.text||id}</div>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text,fontFamily:"monospace",marginTop:2}}>{val}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* NO CONFORMIDADES */}
+        {noCount>0?(
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>No conformidades ({noCount})</div>
+            {Object.values(grouped).map(({pos,items:ids})=>(
+              <div key={pos.id} style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,overflow:"hidden",marginBottom:8}}>
+                <div style={{background:pos.light,padding:"10px 14px",display:"flex",alignItems:"center",gap:8,borderBottom:`1px solid ${pos.color}25`}}>
+                  <div style={{width:22,height:22,borderRadius:6,background:pos.color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:11,fontWeight:800,color:C.white}}>{pos.id}</span>
+                  </div>
+                  <span style={{fontSize:13,fontWeight:700,color:pos.dark}}>{pos.name}</span>
+                </div>
+                {ids.map((id,i)=>{
+                  const item=pos.items.find(it=>it.id===id);
+                  return(
+                    <div key={id} style={{padding:"11px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:i<ids.length-1?`1px solid ${C.border}`:"none"}}>
+                      <Icon n="close" size={15} color={C.red}/>
+                      <span style={{fontSize:13,color:C.text}}>{item?.text||ITEM_LABELS[id]||id}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ):(
+          <div style={{background:C.greenLt,borderRadius:13,border:`1.5px solid ${C.green}`,padding:"20px",textAlign:"center",marginBottom:16}}>
+            <Icon n="check" size={24} color={C.greenXdk}/>
+            <div style={{fontSize:14,fontWeight:700,color:C.greenXdk,marginTop:8}}>Sin no conformidades</div>
+            <div style={{fontSize:12,color:C.greenDk,marginTop:3}}>Todos los ítems aprobados.</div>
+          </div>
+        )}
+
+        {/* ACCIONES */}
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <button onClick={onHome} style={{width:"100%",padding:"15px",borderRadius:12,border:"none",background:C.navy,color:C.white,fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <Icon n="check" size={18} color={C.green}/>Volver al inicio
+          </button>
+          <button onClick={handlePDF} disabled={pdfState==="loading"}
+            style={{width:"100%",padding:"14px",borderRadius:12,border:`1.5px solid ${pdfState==="done"?C.green:pdfState==="error"?C.red:C.border}`,background:pdfState==="done"?C.greenLt:pdfState==="error"?C.redLt:C.white,color:pdfState==="done"?C.greenXdk:pdfState==="error"?C.red:C.textMd,fontSize:14,fontWeight:600,cursor:pdfState==="loading"?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.2s"}}>
+            {pdfState==="loading"?<><Icon n="file" size={17} color={C.textLt}/>Generando PDF…</>
+             :pdfState==="done"?<><Icon n="check" size={17} color={C.greenDk}/>PDF descargado</>
+             :pdfState==="error"?<><Icon n="close" size={17} color={C.red}/>Error al generar PDF</>
+             :<><Icon n="file" size={17} color={C.textLt}/>Exportar PDF</>}
+          </button>
+          <button onClick={onNewInspection}
+            style={{width:"100%",padding:"14px",borderRadius:12,border:`1.5px solid ${C.green}`,background:C.greenLt,color:C.greenXdk,fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <Icon n="plus" size={17} color={C.greenXdk}/>Nueva inspección
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTE 6 — HISTORIAL COMPLETO
+// ══════════════════════════════════════════════════════════════════════════
+function HistoryScreen({onBack,onViewDetail,licenseInfo}){
+  const[search,setSearch]=useState("");
+  const[dateFilter,setDateFilter]=useState("todo");
+  const[resultFilter,setResultFilter]=useState("all");
+  const[customFrom,setCustomFrom]=useState("");
+  const[customTo,setCustomTo]=useState(TODAY);
+  const[showCustom,setShowCustom]=useState(false);
+  const[xlsxState,setXlsxState]=useState("idle"); // idle|loading|done|error
+
+  // Leer inspecciones guardadas
+  const saved=useMemo(()=>{
+    try{return JSON.parse(localStorage.getItem("cp_inspections")||"[]");}
+    catch{return [];}
+  },[]);
+
+  const allRecords=useMemo(()=>{
+    const savedOTs=new Set(saved.map(r=>r.ot));
+    const mockFilt=MOCK.filter(r=>!savedOTs.has(r.ot));
+    return [...saved,...mockFilt].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  },[saved]);
+
+  const dateMatch=useMemo(()=>{
+    if(dateFilter==="hoy")    return d=>d===TODAY;
+    if(dateFilter==="semana") return d=>d>="2026-05-17";
+    if(dateFilter==="mes")    return d=>d>="2026-05-01";
+    if(dateFilter==="custom") return d=>(!customFrom||d>=customFrom)&&(!customTo||d<=customTo);
+    return ()=>true;
+  },[dateFilter,customFrom,customTo]);
+
+  const filtered=useMemo(()=>{
+    const q=search.trim().toLowerCase();
+    return allRecords.filter(r=>{
+      if(!dateMatch(r.date)) return false;
+      if(resultFilter!=="all"&&r.result!==resultFilter) return false;
+      if(q&&!r.placa.toLowerCase().includes(q)&&!r.ot.toLowerCase().includes(q)&&!(r.inspector||"").toLowerCase().includes(q)) return false;
+      return true;
+    });
+  },[allRecords,search,dateMatch,resultFilter]);
+
+  // Stats del período filtrado
+  const stats=useMemo(()=>{
+    const t=filtered.length;
+    const ok=filtered.filter(r=>r.result==="ok").length;
+    const warn=filtered.filter(r=>r.result==="warn").length;
+    const fail=filtered.filter(r=>r.result==="fail").length;
+    return{total:t,ok,warn,fail,tasa:t?Math.round(ok/t*100):0};
+  },[filtered]);
+
+  // Observación más frecuente en el período
+  const topObs=useMemo(()=>{
+    const counts={};
+    filtered.forEach(r=>(r.nos||[]).forEach(id=>{counts[id]=(counts[id]||0)+1;}));
+    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    return top?{id:top[0],n:top[1],label:ITEM_LABELS[top[0]]||top[0]}:null;
+  },[filtered]);
+
+  const resultMeta={
+    ok:  {label:"Aprobado",   color:C.greenDk,bg:C.greenLt, icon:"check"},
+    warn:{label:"Con obs.",   color:C.amberDk,bg:C.amberLt, icon:"warn"},
+    fail:{label:"Rechazado",  color:C.red,    bg:C.redLt,   icon:"close"},
+  };
+  const datePills=[{k:"hoy",l:"Hoy"},{k:"semana",l:"Esta semana"},{k:"mes",l:"Este mes"},{k:"todo",l:"Todo"},{k:"custom",l:"Personalizado",icon:"filter"}];
+  const resFilt=[{k:"all",l:"Todos"},{k:"ok",l:"Aprobados"},{k:"warn",l:"Con obs."},{k:"fail",l:"Rechazados"}];
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:C.navy,position:"sticky",top:0,zIndex:10}}>
+        <div style={{padding:"14px 18px 12px",display:"flex",alignItems:"center",gap:14}}>
+          <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}>
+            <Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/>
+          </button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.white}}>Historial de inspecciones</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>{allRecords.length} registros en total</div>
+          </div>
+          {/* Botón exportar Excel */}
+          <button
+            onClick={()=>{
+                            setXlsxState("loading");
+              setTimeout(()=>{
+                const ok=exportToExcel(allRecords);
+                setXlsxState(ok?"done":"error");
+                setTimeout(()=>setXlsxState("idle"),3000);
+              },80);
+            }}
+            disabled={xlsxState==="loading"}
+            style={{background:xlsxState==="done"?C.greenDk:xlsxState==="error"?C.red:"rgba(255,255,255,0.1)",border:`1px solid ${xlsxState==="done"?C.green:xlsxState==="error"?C.red:"rgba(255,255,255,0.2)"}`,borderRadius:9,padding:"7px 12px",cursor:xlsxState==="loading"?"default":"pointer",display:"flex",alignItems:"center",gap:6,flexShrink:0,transition:"all 0.2s"}}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={xlsxState==="done"?C.white:xlsxState==="error"?C.white:"rgba(255,255,255,0.7)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M8 13h8M8 17h5"/></svg>
+            <span style={{fontSize:11,fontWeight:600,color:xlsxState==="done"?C.white:xlsxState==="error"?C.white:"rgba(255,255,255,0.7)",whiteSpace:"nowrap"}}>
+              {xlsxState==="loading"?"Exportando…":xlsxState==="done"?"Descargado":xlsxState==="error"?"Error":"Excel"}
+            </span>
+          </button>
+        </div>
+
+        {/* Stats rápidas en el header */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:0,borderTop:`1px solid rgba(255,255,255,0.08)`,padding:"10px 18px 12px"}}>
+          {[
+            {v:stats.total,    l:"Total",      c:"rgba(255,255,255,0.9)"},
+            {v:stats.ok,       l:"Aprobados",  c:C.green},
+            {v:stats.warn,     l:"Con obs.",   c:C.amber},
+            {v:stats.fail,     l:"Rechazados", c:stats.fail>0?"#FF7875":"rgba(255,255,255,0.4)"},
+          ].map((s,i)=>(
+            <div key={i} style={{textAlign:"center"}}>
+              <div style={{fontSize:18,fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.45)",marginTop:2}}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Barra de tasa de aprobación */}
+        <div style={{height:3,background:"rgba(255,255,255,0.1)"}}>
+          <div style={{height:3,width:`${stats.tasa}%`,background:C.green,transition:"width 0.4s"}}/>
+        </div>
+      </div>
+
+      <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+
+        {/* Observación más frecuente */}
+        {topObs&&(
+          <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:34,height:34,borderRadius:8,background:C.redLt,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <Icon n="trend" size={17} color={C.red}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1.2,textTransform:"uppercase",marginBottom:2}}>Observación más frecuente</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.text}}>{topObs.label}</div>
+            </div>
+            <div style={{background:C.redLt,borderRadius:8,padding:"4px 10px"}}>
+              <span style={{fontSize:13,fontWeight:800,color:C.red}}>{topObs.n}x</span>
+            </div>
+          </div>
+        )}
+
+        {/* Búsqueda */}
+        <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <Icon n="search" size={17} color={C.textLt}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por placa, OT o inspector…"
+            style={{flex:1,border:"none",outline:"none",fontSize:14,color:C.text,background:"transparent",fontFamily:"inherit"}}/>
+          {search&&<button onClick={()=>setSearch("")} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Icon n="close" size={15} color={C.textLt}/></button>}
+        </div>
+
+        {/* Filtro por resultado */}
+        <div style={{display:"flex",gap:7}}>
+          {resFilt.map(({k,l})=>{
+            const active=resultFilter===k;
+            const m=resultMeta[k];
+            return(
+              <button key={k} onClick={()=>setResultFilter(k)} style={{flex:1,padding:"7px 4px",borderRadius:20,border:`1px solid ${active&&k!=="all"?m?.color:active?C.green:C.border}`,background:active&&k!=="all"?m?.bg:active?C.greenLt:C.white,color:active&&k!=="all"?m?.color:active?C.greenXdk:C.textMd,fontSize:12,fontWeight:active?700:400,cursor:"pointer",transition:"all 0.15s"}}>
+                {l}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Filtro por fecha */}
+        <div>
+          <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:2}}>
+            {datePills.map(({k,l,icon})=>{
+              const active=dateFilter===k;
+              return(
+                <button key={k} onClick={()=>{setDateFilter(k);setShowCustom(k==="custom");}} style={{flexShrink:0,padding:"6px 12px",borderRadius:20,border:`1px solid ${active?C.green:C.border}`,background:active?C.greenLt:C.white,color:active?C.greenXdk:C.textMd,fontSize:12,fontWeight:active?700:400,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                  {icon&&<Icon n={icon} size={12} color={active?C.greenXdk:C.textMd}/>}{l}
+                </button>
+              );
+            })}
+          </div>
+          {showCustom&&(
+            <div style={{marginTop:10,background:C.white,borderRadius:12,border:`1.5px solid ${C.green}`,padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.greenXdk,display:"flex",alignItems:"center",gap:6}}><Icon n="calendar" size={14} color={C.greenXdk}/>Rango de fechas</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <div><label style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1,textTransform:"uppercase",display:"block",marginBottom:6}}>Desde</label><input type="date" value={customFrom} onChange={e=>setCustomFrom(e.target.value)} max={customTo||TODAY} style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 10px",fontSize:13,color:C.text,background:C.surface,outline:"none"}}/></div>
+                <div><label style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1,textTransform:"uppercase",display:"block",marginBottom:6}}>Hasta</label><input type="date" value={customTo} onChange={e=>setCustomTo(e.target.value)} min={customFrom} max={TODAY} style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 10px",fontSize:13,color:C.text,background:C.surface,outline:"none"}}/></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lista completa */}
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>
+            {filtered.length} inspección{filtered.length!==1?"es":""}
+            {(search||resultFilter!=="all"||dateFilter!=="todo")&&(
+              <button onClick={()=>{setSearch("");setResultFilter("all");setDateFilter("todo");setShowCustom(false);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:C.textLt,marginLeft:10,textDecoration:"underline"}}>limpiar filtros</button>
+            )}
+          </div>
+
+          {filtered.length===0?(
+            <div style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"40px 20px",textAlign:"center"}}>
+              <Icon n="search" size={32} color={C.textLt}/>
+              <div style={{fontSize:14,fontWeight:600,color:C.textMd,marginTop:12}}>Sin resultados</div>
+              <div style={{fontSize:13,color:C.textLt,marginTop:4}}>Prueba ajustando los filtros</div>
+            </div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {filtered.map(r=>{
+                const m=resultMeta[r.result];
+                const isReal=!!r.checks; // inspección real vs MOCK
+                return(
+                  <div key={r.id} onClick={()=>onViewDetail(r)}
+                    style={{background:C.white,borderRadius:12,border:`1px solid ${C.border}`,padding:"12px 14px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",transition:"border-color 0.15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor=m.color}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
+                    <div style={{width:38,height:38,borderRadius:10,background:m.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      <Icon n={m.icon} size={19} color={m.color}/>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                        <span style={{fontSize:14,fontWeight:700,color:C.text}}>{r.placa}</span>
+                        <span style={{fontSize:11,color:C.textLt}}>·</span>
+                        <span style={{fontSize:12,color:C.textMd}}>{r.ot}</span>
+                        {isReal&&<span style={{fontSize:9,fontWeight:700,color:C.green,background:C.greenLt,borderRadius:4,padding:"1px 5px"}}>REAL</span>}
+                      </div>
+                      <div style={{fontSize:12,color:C.textLt}}>{r.model||"—"} · {r.inspector||"—"}</div>
+                      <div style={{fontSize:11,color:C.textLt,marginTop:1}}>{r.motivo||"—"}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:11,fontWeight:700,color:m.color}}>{m.label}</div>
+                      <div style={{fontSize:10,color:C.textLt,marginTop:2}}>{r.date}</div>
+                      {(r.nos||[]).length>0&&<div style={{fontSize:10,color:C.red,marginTop:2}}>{r.nos.length} NO</div>}
+                    </div>
+                    <Icon n="arrowR" size={14} color={C.textLt}/>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Nav inferior */}
+      <BottomNav active="history" onInspection={()=>onBack()} onHistory={()=>{}} onSettings={()=>onBack()}/>
+    </div>
+  );
+}
+
+function Placeholder({title,onBack}){
+  return(
+    <div style={{minHeight:"100vh",background:C.surface}}>
+      <div style={{background:C.navy,padding:"16px 18px",display:"flex",alignItems:"center",gap:14}}>
+        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4}}><Icon n="arrowL" size={20} color={C.white}/></button>
+        <Logo size={26}/>
+      </div>
+      <div style={{padding:32,textAlign:"center",maxWidth:360,margin:"0 auto"}}>
+        <div style={{width:64,height:64,borderRadius:16,background:C.greenLt,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><Icon n="chart" size={30} color={C.greenDk}/></div>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:8}}>{title}</div>
+        <div style={{fontSize:14,color:C.textMd,lineHeight:1.6}}>Esta sección se construye en la siguiente parte.</div>
+        <button onClick={onBack} style={{marginTop:24,padding:"12px 24px",background:C.navy,color:C.white,border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>← Volver al dashboard</button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// EXPORTAR A EXCEL — BACKUP DE INSPECCIONES
+// ══════════════════════════════════════════════════════════════════════════
+function exportToExcel(records){
+  try{
+    // Sin librería externa — SpreadsheetML nativo (Excel, Sheets y LibreOffice lo leen)
+    const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    const hCell=v=>`<Cell ss:StyleID="h"><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+    const sCell=v=>`<Cell><Data ss:Type="String">${esc(v)}</Data></Cell>`;
+    const nCell=v=>`<Cell><Data ss:Type="Number">${Number(v)||0}</Data></Cell>`;
+    const row=(...cells)=>`<Row>${cells.join("")}</Row>`;
+    const sheet=(name,rows)=>`<Worksheet ss:Name="${esc(name)}"><Table>${rows.join("")}</Table></Worksheet>`;
+
+    const resultLabel={ok:"Aprobado",warn:"Con observaciones",fail:"Rechazado"};
+
+    // Hoja 1: Resumen
+    const s1=[row(hCell("Fecha"),hCell("Placa"),hCell("OT"),hCell("Modelo"),hCell("Inspector"),hCell("Motivo de visita"),hCell("Resultado"),hCell("N° NOs"),hCell("Ítems NO conformes"))];
+    records.forEach(r=>s1.push(row(
+      sCell(r.date),sCell(r.placa),sCell(r.ot),sCell(r.model||"—"),
+      sCell(r.inspector||"—"),sCell(r.motivo||"—"),
+      sCell(resultLabel[r.result]||r.result),
+      nCell((r.nos||[]).length),
+      sCell((r.nos||[]).map(id=>ITEM_LABELS[id]||id).join(" | ")||"Ninguno")
+    )));
+
+    // Hoja 2: Detalle por ítem
+    const s2=[row(hCell("Fecha"),hCell("Placa"),hCell("OT"),hCell("ID"),hCell("Descripción"),hCell("Posición"),hCell("Estado"),hCell("Medición"))];
+    records.forEach(r=>{
+      if(!r.checks||!Object.keys(r.checks).length) return;
+      POSITIONS.forEach(pos=>{
+        if(pos.ev&&!r.isEV) return;
+        pos.items.forEach(item=>{
+          const st=r.checks[item.id];
+          if(!st) return;
+          s2.push(row(sCell(r.date),sCell(r.placa),sCell(r.ot),sCell(item.id),sCell(item.text),sCell(pos.name),sCell(st==="ok"?"OK":st==="no"?"NO":"N/A"),sCell(r.meas?.[item.id]||"")));
+        });
+      });
+    });
+
+    // Hoja 3: Frecuencia de NOs
+    const counts={};
+    records.forEach(r=>(r.nos||[]).forEach(id=>{counts[id]=(counts[id]||0)+1;}));
+    const s3=[row(hCell("ID"),hCell("Descripción"),hCell("Posición"),hCell("Frecuencia"),hCell("% de inspecciones"))];
+    Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([id,n])=>{
+      const pos=POSITIONS.find(p=>p.items.some(it=>it.id===id));
+      s3.push(row(sCell(id),sCell(ITEM_LABELS[id]||id),sCell(pos?.name||"—"),nCell(n),sCell(records.length?`${Math.round(n/records.length*100)}%`:"—")));
+    });
+
+    const xml=`<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles><Style ss:ID="h"><Font ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0D1B2A" ss:Pattern="Solid"/></Style></Styles>
+${sheet("Inspecciones",s1)}
+${s2.length>1?sheet("Detalle de ítems",s2):""}
+${s3.length>1?sheet("Frecuencia NOs",s3):""}
+</Workbook>`;
+
+    const blob=new Blob([xml],{type:"application/vnd.ms-excel;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    const tallerName=getTallerName().replace(/[^a-zA-Z0-9]/g,"_")||"CheckPit";
+    a.href=url;
+    a.download=`${tallerName}_Backup_${new Date().toISOString().slice(0,10)}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return true;
+  }catch(e){
+    console.error("Excel export:",e);
+    return false;
+  }
+}
+// ══════════════════════════════════════════════════════════════════════════
+function generateActionPlanPDF(items,totalInspections,period,tallerName){
+  try{
+    const{jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'l',unit:'mm',format:'a4'}); // landscape
+    const W=297,H=210,M=12,CW=W-M*2;
+    let y=0;
+    const navy=[13,27,42],white=[255,255,255],dark=[15,23,42];
+    const lgray=[241,245,249],border=[203,213,225],gray=[100,116,139];
+    const green=[0,126,89],red=[184,24,24];
+    const txt=(t,x,yy,opts={})=>doc.text(String(t),x,yy,opts);
+    const setClr=(r,g,b)=>doc.setTextColor(r,g,b);
+    const setFill=(r,g,b)=>doc.setFillColor(r,g,b);
+    const setDraw=(r,g,b)=>doc.setDrawColor(r,g,b);
+
+    // Cabecera
+    setFill(...navy); doc.rect(0,0,W,18,'F');
+    setClr(...white);
+    doc.setFontSize(13); doc.setFont('helvetica','bold');
+    txt('CheckPit — Informe de Observaciones y Planes de Acción',M,8);
+    doc.setFontSize(8); doc.setFont('helvetica','normal');
+    txt(`${tallerName||'Red de Talleres'} · Período: ${period} · ${totalInspections} inspecciones analizadas · Generado: ${new Date().toLocaleDateString('es-CO')}`,M,14);
+    y=24;
+
+    // Cabecera de tabla
+    const colW=[8,52,28,14,14,80,42,35]; // #|Observación|Posición|Frec|%|Acción correctiva|Responsable|Fecha compromiso
+    const colX=[M];
+    colW.forEach((w,i)=>{ if(i>0) colX.push(colX[i-1]+colW[i-1]); });
+    const headers=['#','Observación detectada','Posición','Frec.','%','Acción correctiva propuesta','Responsable','Fecha compromiso'];
+
+    setFill(...navy); doc.rect(M,y,CW,7,'F');
+    headers.forEach((h,i)=>{
+      setClr(...white); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      txt(h,colX[i]+1.5,y+4.8);
+    });
+    y+=7;
+
+    // Filas
+    items.forEach((obs,idx)=>{
+      const rowH=obs.action.length>80?14:10;
+      if(y+rowH>H-M-10){doc.addPage();y=M;}
+      const bg=idx%2===0?white:lgray;
+      setFill(...bg); setDraw(...border);
+      doc.rect(M,y,CW,rowH,'FD');
+
+      const posRGB=[[124,58,237],[0,158,114],[169,108,7],[30,100,180],[10,98,140],[169,108,7]];
+      const pc=posRGB[(obs.posId-1)%posRGB.length]||[100,116,139];
+
+      // #
+      setClr(...pc); doc.setFontSize(7); doc.setFont('helvetica','bold');
+      txt(idx+1,colX[0]+colW[0]/2,y+rowH/2+1,{align:'center'});
+      // Observación
+      setClr(...dark); doc.setFontSize(7); doc.setFont('helvetica','normal');
+      const obsLines=doc.splitTextToSize(obs.label,colW[1]-3);
+      txt(obsLines.slice(0,2).join('\n'),colX[1]+1,y+3.5);
+      // Posición
+      setClr(...pc); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      txt(doc.splitTextToSize(obs.posName,colW[2]-3)[0],colX[2]+1,y+rowH/2+1);
+      // Frecuencia
+      setClr(...red); doc.setFontSize(8); doc.setFont('helvetica','bold');
+      txt(obs.n,colX[3]+colW[3]/2,y+rowH/2+1,{align:'center'});
+      // %
+      setClr(...gray); doc.setFontSize(7); doc.setFont('helvetica','normal');
+      txt(obs.pct+'%',colX[4]+colW[4]/2,y+rowH/2+1,{align:'center'});
+      // Acción correctiva
+      setClr(...dark); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      const actionLines=doc.splitTextToSize(obs.action,colW[5]-3);
+      txt(actionLines.slice(0,rowH>10?3:2).join('\n'),colX[5]+1,y+3.5);
+      // Responsable y Fecha (líneas en blanco para llenar)
+      setDraw(...border);
+      doc.line(colX[6]+2,y+rowH-3,colX[6]+colW[6]-3,y+rowH-3);
+      doc.line(colX[7]+2,y+rowH-3,colX[7]+colW[7]-3,y+rowH-3);
+      y+=rowH;
+    });
+
+    // Firma y aprobación
+    y+=8;
+    if(y>H-30){doc.addPage();y=M;}
+    setDraw(...border); doc.line(M,y,W-M,y); y+=6;
+    setClr(...dark); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    txt('Aprobación del informe',M,y); y+=7;
+    const sw=(CW-12)/3;
+    ['Gerente de Postventa','Supervisor de Taller','Inspector de Calidad'].forEach((l,i)=>{
+      const sx=M+i*(sw+6);
+      setFill(...lgray); setDraw(...border); doc.rect(sx,y,sw,18,'FD');
+      setClr(...gray); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      txt(l,sx+sw/2,y+4,{align:'center'});
+      doc.line(sx+3,y+14,sx+sw-3,y+14);
+      doc.setFont('helvetica','normal'); txt('Nombre y firma',sx+sw/2,y+17.5,{align:'center'});
+    });
+
+    // Pie
+    const pages=doc.internal.getNumberOfPages();
+    for(let i=1;i<=pages;i++){
+      doc.setPage(i);
+      setClr(...gray); doc.setFontSize(6); doc.setFont('helvetica','normal');
+      txt(`CheckPit — Informe de Planes de Acción — ${tallerName||''}`,M,H-4);
+      txt(`Página ${i} de ${pages}`,W-M,H-4,{align:'right'});
+    }
+    doc.save(`CheckPit_PlanAccion_${new Date().toISOString().slice(0,10)}.pdf`);
+    return true;
+  }catch(e){console.error('PDF plan:',e);return false;}
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTE 7B — PANTALLA: INFORME CON PLANES DE ACCIÓN
+// ══════════════════════════════════════════════════════════════════════════
+function ActionPlanScreen({onBack}){
+  const[dateFilter,setDateFilter]=useState("mes");
+  const[customFrom,setCustomFrom]=useState("");
+  const[customTo,setCustomTo]=useState(TODAY);
+  const[showCustom,setShowCustom]=useState(false);
+  const[pdfState,setPdfState]=useState("idle");
+  const[editedActions,setEditedActions]=useState({});
+
+  const allRecords=useMemo(()=>{
+    try{
+      const saved=JSON.parse(localStorage.getItem("cp_inspections")||"[]");
+      const savedOTs=new Set(saved.map(r=>r.ot));
+      return [...saved,...MOCK.filter(r=>!savedOTs.has(r.ot))];
+    }catch{return MOCK;}
+  },[]);
+
+  const dateMatch=useMemo(()=>{
+    if(dateFilter==="semana") return d=>d>="2026-05-17";
+    if(dateFilter==="mes")    return d=>d>="2026-05-01";
+    if(dateFilter==="custom") return d=>(!customFrom||d>=customFrom)&&(!customTo||d<=customTo);
+    return ()=>true;
+  },[dateFilter,customFrom,customTo]);
+
+  const filtered=useMemo(()=>allRecords.filter(r=>dateMatch(r.date)),[allRecords,dateMatch]);
+
+  // Calcular frecuencias de NOs
+  const obsItems=useMemo(()=>{
+    const counts={};
+    filtered.forEach(r=>(r.nos||[]).forEach(id=>{counts[id]=(counts[id]||0)+1;}));
+    return Object.entries(counts)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,10)
+      .map(([id,n])=>{
+        const pos=POSITIONS.find(p=>p.items.some(it=>it.id===id));
+        return{
+          id,n,
+          label:ITEM_LABELS[id]||id,
+          action:CORRECTIVE_ACTIONS[id]||"Revisar procedimiento y capacitar al equipo técnico.",
+          posId:pos?.id||0,
+          posName:pos?.name||"—",
+          posColor:pos?.color||C.textLt,
+          posLight:pos?.light||C.surface,
+          pct:filtered.length?Math.round(n/filtered.length*100):0,
+        };
+      });
+  },[filtered]);
+
+  const periodLabel=dateFilter==="semana"?"Esta semana":dateFilter==="mes"?"Este mes":dateFilter==="custom"&&(customFrom||customTo)?`${customFrom||"..."} → ${customTo||"..."}` :"Todos los registros";
+
+  const handlePDF=()=>{
+    if(!window.jspdf){setPdfState("error");return;}
+    setPdfState("loading");
+    // Pasar acciones editadas al PDF
+    const itemsWithEdits=obsItems.map(obs=>({...obs,action:getAction(obs.id)}));
+    setTimeout(()=>{
+      const ok=generateActionPlanPDF(itemsWithEdits,filtered.length,periodLabel,getTallerName());
+      setPdfState(ok?"done":"error");
+      setTimeout(()=>setPdfState("idle"),3000);
+    },80);
+  };
+
+  const posRGBmap={1:C.purple,2:C.green,3:C.amber,4:C.blue,5:C.teal,6:C.amber};
+  const getAction=(id)=>editedActions[id]!==undefined?editedActions[id]:(CORRECTIVE_ACTIONS[id]||"Revisar procedimiento y capacitar al equipo técnico.");
+  const setAction=(id,val)=>setEditedActions(p=>({...p,[id]:val}));
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,paddingBottom:32}}>
+      <div style={{background:C.navy,padding:"0 18px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 0 14px"}}>
+          <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}>
+            <Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/>
+          </button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.white}}>Informe con planes de acción</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:1}}>Top no conformidades del período</div>
+          </div>
+        </div>
+        <div style={{height:2,background:C.green,opacity:0.6}}/>
+      </div>
+
+      <div style={{padding:"16px"}}>
+        {/* Filtro de período */}
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"14px 16px",marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:700,color:C.textLt,letterSpacing:1.2,textTransform:"uppercase",marginBottom:10}}>Período del informe</div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {[{k:"semana",l:"Esta semana"},{k:"mes",l:"Este mes"},{k:"todo",l:"Todo"},{k:"custom",l:"Personalizado"}].map(({k,l})=>{
+              const active=dateFilter===k;
+              return(
+                <button key={k} onClick={()=>{setDateFilter(k);setShowCustom(k==="custom");}} style={{padding:"7px 14px",borderRadius:20,border:`1px solid ${active?C.green:C.border}`,background:active?C.greenLt:C.white,color:active?C.greenXdk:C.textMd,fontSize:13,fontWeight:active?700:400,cursor:"pointer"}}>
+                  {l}
+                </button>
+              );
+            })}
+          </div>
+          {showCustom&&(
+            <div style={{marginTop:12,display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><label style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1,textTransform:"uppercase",display:"block",marginBottom:6}}>Desde</label><input type="date" value={customFrom} onChange={e=>setCustomFrom(e.target.value)} max={customTo||TODAY} style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 10px",fontSize:13,color:C.text,background:C.surface,outline:"none"}}/></div>
+              <div><label style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1,textTransform:"uppercase",display:"block",marginBottom:6}}>Hasta</label><input type="date" value={customTo} onChange={e=>setCustomTo(e.target.value)} min={customFrom} max={TODAY} style={{width:"100%",border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 10px",fontSize:13,color:C.text,background:C.surface,outline:"none"}}/></div>
+            </div>
+          )}
+          <div style={{marginTop:10,fontSize:12,color:C.textMd,background:C.surface,borderRadius:8,padding:"8px 12px",display:"flex",justifyContent:"space-between"}}>
+            <span>Período: <strong>{periodLabel}</strong></span>
+            <span style={{color:filtered.length>0?C.greenXdk:C.textLt,fontWeight:600}}>{filtered.length} inspecciones</span>
+          </div>
+        </div>
+
+        {/* Lista de observaciones con planes */}
+        {obsItems.length===0?(
+          <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"40px 20px",textAlign:"center"}}>
+            <Icon n="check" size={36} color={C.greenDk}/>
+            <div style={{fontSize:15,fontWeight:700,color:C.greenXdk,marginTop:12}}>Sin no conformidades en el período</div>
+            <div style={{fontSize:13,color:C.textMd,marginTop:4}}>No hay ítems que requieran plan de acción.</div>
+          </div>
+        ):(
+          <>
+            <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:10}}>
+              {obsItems.length} observación{obsItems.length!==1?"es":""} · ordenadas por frecuencia
+            </div>
+            {obsItems.map((obs,i)=>(
+              <div key={obs.id} style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,marginBottom:10,overflow:"hidden"}}>
+                {/* Header del ítem */}
+                <div style={{background:obs.posLight||C.surface,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{width:26,height:26,borderRadius:7,background:obs.posColor,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <span style={{fontSize:12,fontWeight:800,color:C.white}}>{i+1}</span>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:C.text}}>{obs.label}</div>
+                    <div style={{fontSize:11,color:C.textLt,marginTop:1}}>{obs.posName}</div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:18,fontWeight:800,color:C.red,lineHeight:1}}>{obs.n}x</div>
+                    <div style={{fontSize:10,color:C.textLt,marginTop:1}}>{obs.pct}% de inspecciones</div>
+                  </div>
+                </div>
+                {/* Barra de frecuencia */}
+                <div style={{height:3,background:C.surface}}>
+                  <div style={{height:3,width:`${Math.min(obs.pct*2,100)}%`,background:C.red,transition:"width 0.4s"}}/>
+                </div>
+                {/* Acción correctiva — editable */}
+                <div style={{padding:"12px 14px"}}>
+                  <div style={{fontSize:10,fontWeight:700,color:C.textLt,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span>Acción correctiva propuesta</span>
+                    <span style={{fontSize:9,color:C.textLt,fontWeight:400,fontStyle:"italic"}}>editable</span>
+                  </div>
+                  <textarea
+                    value={getAction(obs.id)}
+                    onChange={e=>setAction(obs.id,e.target.value)}
+                    rows={3}
+                    style={{width:"100%",border:`1.5px solid ${C.border}`,borderRadius:8,padding:"10px 12px",fontSize:13,color:C.text,lineHeight:1.6,fontFamily:"inherit",background:C.surface,outline:"none",resize:"vertical",boxSizing:"border-box"}}
+                  />
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* Botón generar PDF */}
+        {obsItems.length>0&&(
+          <button onClick={handlePDF} disabled={pdfState==="loading"}
+            style={{width:"100%",padding:"15px",borderRadius:12,border:"none",
+              background:pdfState==="done"?C.greenDk:pdfState==="error"?C.red:C.navy,
+              color:C.white,fontSize:15,fontWeight:700,cursor:pdfState==="loading"?"default":"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background 0.2s",marginTop:4}}>
+            {pdfState==="loading"?<><Icon n="file" size={18} color="rgba(255,255,255,0.6)"/>Generando informe…</>
+             :pdfState==="done"?<><Icon n="check" size={18} color={C.white}/>Informe descargado</>
+             :pdfState==="error"?<><Icon n="close" size={18} color={C.white}/>Error al generar</>
+             :<><Icon n="file" size={18} color={C.green}/>Generar PDF del informe</>}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Botón reutilizable de backup Excel
+function ExcelBackupBtn(){
+  const[st,setSt]=useState("idle");
+  const handle=()=>{
+        setSt("loading");
+    setTimeout(()=>{
+      try{
+        const saved=JSON.parse(localStorage.getItem("cp_inspections")||"[]");
+        const savedOTs=new Set(saved.map(r=>r.ot));
+        const all=[...saved,...MOCK.filter(r=>!savedOTs.has(r.ot))].sort((a,b)=>b.date.localeCompare(a.date));
+        const ok=exportToExcel(all);
+        setSt(ok?"done":"error");
+      }catch{setSt("error");}
+      setTimeout(()=>setSt("idle"),3000);
+    },80);
+  };
+  return(
+    <button onClick={handle} disabled={st==="loading"} style={{width:"100%",padding:"12px",borderRadius:10,border:`1.5px solid ${st==="done"?C.green:st==="error"?C.red:C.border}`,background:st==="done"?C.greenLt:st==="error"?C.redLt:C.white,color:st==="done"?C.greenXdk:st==="error"?C.red:C.textMd,fontSize:14,fontWeight:600,cursor:st==="loading"?"default":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.2s",marginBottom:10}}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M8 13h8M8 17h5"/></svg>
+      {st==="loading"?"Generando Excel…":st==="done"?"Backup descargado correctamente":st==="error"?"Error al exportar":"Exportar historial en Excel (.xlsx)"}
+    </button>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PARTE 7C — AJUSTES DEL TALLER
+// ══════════════════════════════════════════════════════════════════════════
+function SettingsScreen({onBack,licenseInfo}){
+  const cfg=getTallerConfig();
+  const[tallerName,setTallerName]=useState(cfg.tallerName||"");
+  const[inspector,setInspector]=useState(cfg.inspector||"");
+  const[saved,setSavedMsg]=useState(false);
+  const[showClearConfirm,setShowClearConfirm]=useState(false);
+  const[cleared,setCleared]=useState(false);
+
+  const handleSave=()=>{
+    saveTallerConfig({...getTallerConfig(),tallerName,inspector});
+    setSavedMsg(true);
+    setTimeout(()=>setSavedMsg(false),2500);
+  };
+
+  const handleClear=()=>{
+    localStorage.removeItem("cp_inspections");
+    setCleared(true);
+    setShowClearConfirm(false);
+    setTimeout(()=>setCleared(false),2500);
+  };
+
+  const licCode=localStorage.getItem("cp_license")||"—";
+  const totalInspections=()=>{try{return JSON.parse(localStorage.getItem("cp_inspections")||"[]").length;}catch{return 0;}};
+
+  return(
+    <div style={{minHeight:"100vh",background:C.surface,paddingBottom:80}}>
+      <div style={{background:C.navy,padding:"0 18px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,padding:"16px 0 16px"}}>
+          <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:4,flexShrink:0}}>
+            <Icon n="arrowL" size={22} color="rgba(255,255,255,0.7)"/>
+          </button>
+          <div style={{fontSize:16,fontWeight:700,color:C.white}}>Ajustes del taller</div>
+        </div>
+      </div>
+
+      <div style={{padding:"16px",display:"flex",flexDirection:"column",gap:14}}>
+
+        {/* Datos del taller */}
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 16px",display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:12,borderBottom:`1px solid ${C.border}`}}>
+            <div style={{width:30,height:30,borderRadius:7,background:C.greenLt,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon n="shield" size={15} color={C.greenDk}/></div>
+            <span style={{fontSize:14,fontWeight:700,color:C.text}}>Datos del taller</span>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:700,letterSpacing:1.2,color:C.textLt,textTransform:"uppercase",display:"block",marginBottom:7}}>Nombre del taller</label>
+            <input value={tallerName} onChange={e=>setTallerName(e.target.value)} placeholder="Ej: Taller Autorizado MB Bogotá Norte"
+              style={{width:"100%",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"12px 14px",fontSize:15,background:C.surface,outline:"none",color:C.text,boxSizing:"border-box"}}/>
+            <div style={{fontSize:11,color:C.textLt,marginTop:5}}>Aparece en el encabezado de todos los PDFs generados</div>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:700,letterSpacing:1.2,color:C.textLt,textTransform:"uppercase",display:"block",marginBottom:7}}>Inspector predeterminado</label>
+            <input value={inspector} onChange={e=>setInspector(e.target.value)} placeholder="Nombre que aparece por defecto en el formulario"
+              style={{width:"100%",border:`1.5px solid ${C.border}`,borderRadius:9,padding:"12px 14px",fontSize:15,background:C.surface,outline:"none",color:C.text,boxSizing:"border-box"}}/>
+          </div>
+          <button onClick={handleSave} style={{padding:"13px",borderRadius:10,border:"none",background:saved?C.greenDk:C.navy,color:C.white,fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background 0.2s"}}>
+            {saved?<><Icon n="check" size={17} color={C.white}/>Guardado</>:<>Guardar cambios</>}
+          </button>
+        </div>
+
+        {/* Información de licencia */}
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.border}`,padding:"18px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:12}}>
+            <div style={{width:30,height:30,borderRadius:7,background:C.blueLt,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon n="lock" size={15} color={C.blue}/></div>
+            <span style={{fontSize:14,fontWeight:700,color:C.text}}>Información de licencia</span>
+          </div>
+          {[
+            ["Código de licencia", licCode],
+            ["Tipo", licenseInfo?.type==="demo"?"Evaluación (1 dispositivo)":"Licencia paga"],
+            ["Taller registrado", licenseInfo?.taller||"—"],
+            ["Inspecciones guardadas", `${totalInspections()} en este dispositivo`],
+            ["Versión de la app", "CheckPit v1.0"],
+          ].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:13,color:C.textLt}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:C.text,textAlign:"right",maxWidth:"55%"}}>{v}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Zona de peligro */}
+        <div style={{background:C.white,borderRadius:14,border:`1px solid ${C.red}30`,padding:"18px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:12}}>
+            <div style={{width:30,height:30,borderRadius:7,background:C.redLt,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon n="warn" size={15} color={C.red}/></div>
+            <span style={{fontSize:14,fontWeight:700,color:C.text}}>Zona de datos</span>
+          </div>
+          <div style={{fontSize:13,color:C.textMd,marginBottom:12,lineHeight:1.6}}>
+            Eliminar el historial borra todas las inspecciones guardadas en este dispositivo. Los datos de ejemplo no se eliminan.
+          </div>
+          {/* Exportar Excel como backup */}
+          <ExcelBackupBtn style={{marginBottom:10}}/>
+          {cleared&&<div style={{background:C.greenLt,borderRadius:8,padding:"10px 12px",marginBottom:10,fontSize:13,color:C.greenXdk,fontWeight:600,display:"flex",alignItems:"center",gap:6}}><Icon n="check" size={15} color={C.greenXdk}/>Historial eliminado correctamente</div>}
+          {!showClearConfirm?(
+            <button onClick={()=>setShowClearConfirm(true)} style={{width:"100%",padding:"12px",borderRadius:10,border:`1.5px solid ${C.red}`,background:C.white,color:C.red,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              Eliminar historial de inspecciones
+            </button>
+          ):(
+            <div style={{background:C.redLt,borderRadius:10,border:`1px solid ${C.red}40`,padding:"14px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.red,marginBottom:10}}>¿Confirmas que quieres eliminar el historial?</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>setShowClearConfirm(false)} style={{padding:"11px",borderRadius:9,border:`1px solid ${C.border}`,background:C.white,fontSize:13,fontWeight:600,cursor:"pointer",color:C.textMd}}>Cancelar</button>
+                <button onClick={handleClear} style={{padding:"11px",borderRadius:9,border:"none",background:C.red,color:C.white,fontSize:13,fontWeight:700,cursor:"pointer"}}>Sí, eliminar</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BottomNav active="settings" onInspection={onBack} onHistory={onBack} onSettings={()=>{}}/>
+    </div>
+  );
+}
+
+function BottomNav({active,onInspection,onHistory,onSettings}){
+  return(
+    <div style={{position:"fixed",bottom:0,left:0,right:0,background:C.white,borderTop:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"8px 0 16px",maxWidth:480,margin:"0 auto"}}>
+      {[{n:"car",l:"Inspección",k:"home",a:onInspection},{n:"history",l:"Historial",k:"history",a:onHistory},{n:"settings",l:"Ajustes",k:"settings",a:onSettings}].map(({n,l,k,a})=>(
+        <button key={k} onClick={a} style={{background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"4px 0"}}>
+          <Icon n={n} size={22} color={active===k?C.green:C.textLt}/>
+          <span style={{fontSize:10,color:active===k?C.green:C.textLt,fontWeight:active===k?700:400}}>{l}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────
+function App(){
+  const[phase,setPhase]=useState("splash");
+  const[licenseInfo,setLicenseInfo]=useState(null);
+  const[inspection,setInspection]=useState(null);
+  const[selectedRecord,setSelectedRecord]=useState(null);
+  const[refreshKey,setRefreshKey]=useState(0);
+
+  useEffect(()=>{
+    const saved=localStorage.getItem("cp_license");
+    if(saved&&LICENSE_RULES[saved]){setLicenseInfo(LICENSE_RULES[saved]);setPhase("home");}
+  },[]);
+
+  const goHome=()=>{setRefreshKey(k=>k+1);setPhase("home");};
+
+  if(phase==="splash")        return <Splash onDone={()=>setPhase("activation")}/>;
+  if(phase==="activation")    return <Activation onActivate={(c,r)=>{setLicenseInfo(r);setPhase("home");}}/>;
+  if(phase==="newInspection") return <NewInspection onBack={goHome} onStart={data=>{setInspection({vehicle:data});setPhase("checklist");}}/>;
+  if(phase==="checklist"&&inspection) return <ChecklistScreen inspection={inspection} onBack={goHome} onFinish={result=>{setInspection(result);setPhase("result");}}/>;
+  if(phase==="result"&&inspection)    return <ResultScreen inspection={inspection} onHome={goHome} onNewInspection={()=>setPhase("newInspection")} licenseInfo={licenseInfo}/>;;
+  if(phase==="detail"&&selectedRecord) return <InspectionDetail record={selectedRecord} onBack={goHome} licenseInfo={licenseInfo}/>;
+
+  return(
+    <div style={{maxWidth:480,margin:"0 auto"}}>
+      {phase==="home"&&<>
+        <Home
+          licenseInfo={licenseInfo}
+          refreshKey={refreshKey}
+          onNewInspection={()=>setPhase("newInspection")}
+          onHistory={()=>setPhase("history")}
+          onSettings={()=>setPhase("settings")}
+          onViewDetail={r=>{setSelectedRecord(r);setPhase("detail");}}
+          onActionPlan={()=>setPhase("actionPlan")}
+        />
+        <BottomNav active="home" onInspection={()=>setPhase("newInspection")} onHistory={()=>setPhase("history")} onSettings={()=>setPhase("settings")}/>
+      </>}
+      {phase==="history"&&<HistoryScreen onBack={goHome} onViewDetail={r=>{setSelectedRecord(r);setPhase("detail");}} licenseInfo={licenseInfo}/>}
+      {phase==="settings"&&<SettingsScreen onBack={goHome} licenseInfo={licenseInfo}/>}
+      {phase==="actionPlan"&&<ActionPlanScreen onBack={goHome}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+<script>
+// ── REGISTRO DEL SERVICE WORKER ──────────────────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        console.log('[CheckPit] SW registrado:', reg.scope);
+        // Detectar actualización disponible
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if(nw.state === 'installed' && navigator.serviceWorker.controller){
+              // Notificar al usuario que hay una actualización
+              window.__cpUpdateAvailable = true;
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('[CheckPit] SW error:', err));
+  });
+}
+
+// ── BANNER DE INSTALACIÓN ─────────────────────────────────────────────────
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Mostrar banner personalizado después de 3 segundos
+  setTimeout(() => {
+    const banner = document.getElementById('cp-install-banner');
+    if(banner) banner.style.display = 'flex';
+  }, 3000);
+});
+
+window.addEventListener('appinstalled', () => {
+  const banner = document.getElementById('cp-install-banner');
+  if(banner) banner.style.display = 'none';
+  deferredPrompt = null;
+  console.log('[CheckPit] App instalada correctamente');
+});
+
+function cpInstall(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(c => {
+    deferredPrompt = null;
+    document.getElementById('cp-install-banner').style.display = 'none';
+  });
+}
+function cpDismissBanner(){
+  document.getElementById('cp-install-banner').style.display = 'none';
+}
+</script>
+
+<!-- Banner de instalación (visible solo cuando el navegador lo permite) -->
+<div id="cp-install-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#0D1B2A;border-top:2px solid #00C48C;padding:14px 18px;align-items:center;gap:14px;max-width:480px;margin:0 auto;box-shadow:0 -4px 20px rgba(0,0,0,0.4);">
+  <div style="width:40px;height:40px;border-radius:10px;background:#00C48C;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0D1B2A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 7"/></svg>
+  </div>
+  <div style="flex:1;">
+    <div style="font-size:14px;font-weight:700;color:#fff;line-height:1.2;">Instalar CheckPit</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:2px;">Funciona sin internet · acceso rápido desde pantalla de inicio</div>
+  </div>
+  <button onclick="cpInstall()" style="background:#00C48C;border:none;border-radius:8px;padding:9px 16px;color:#0D1B2A;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Instalar</button>
+  <button onclick="cpDismissBanner()" style="background:none;border:none;cursor:pointer;padding:4px;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+</div>
+</body>
+</html>
